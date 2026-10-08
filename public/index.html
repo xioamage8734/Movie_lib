@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的电影库</title>
+<style>
+  :root{
+    --bg:#0e1013; --bg2:#161a20; --card:#1b2028; --card2:#232a34;
+    --line:#2b333f; --fg:#e8ecf2; --dim:#93a0b0; --dim2:#67717f;
+    --accent:#ffb703; --accent2:#3ea76a; --danger:#e5533d;
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%}
+  body{
+    background:var(--bg); color:var(--fg);
+    font:14px/1.5 "PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit}
+  button{font:inherit;cursor:pointer}
+
+  /* ---------- 顶栏 ---------- */
+  header{
+    position:sticky; top:0; z-index:30;
+    display:flex; align-items:center; gap:16px;
+    padding:14px 22px; background:rgba(14,16,19,.92);
+    backdrop-filter:blur(10px); border-bottom:1px solid var(--line);
+  }
+  header h1{margin:0;font-size:16px;letter-spacing:.5px;white-space:nowrap}
+  header h1 span{color:var(--accent)}
+  .search{flex:0 1 320px;position:relative}
+  .search input{
+    width:100%;padding:9px 12px 9px 34px;border-radius:9px;
+    background:var(--bg2);border:1px solid var(--line);color:var(--fg);outline:none;
+  }
+  .search input:focus{border-color:var(--accent)}
+  .search::before{content:"⌕";position:absolute;left:11px;top:7px;color:var(--dim2);font-size:15px}
+  .stat{margin-left:auto;color:var(--dim);font-size:12.5px;white-space:nowrap}
+  .stat b{color:var(--fg)}
+
+  /* ---------- 布局 ---------- */
+  .wrap{display:grid;grid-template-columns:236px 1fr;gap:0;align-items:start}
+  aside{
+    position:sticky;top:57px;max-height:calc(100vh - 57px);overflow:auto;
+    padding:18px 18px 60px;border-right:1px solid var(--line);
+  }
+  main{padding:18px 22px 80px;min-height:60vh}
+
+  /* ---------- 筛选 ---------- */
+  .fgroup{margin-bottom:20px}
+  .fgroup>h3{
+    margin:0 0 9px;font-size:11.5px;font-weight:600;letter-spacing:1.2px;
+    text-transform:uppercase;color:var(--dim2);
+  }
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{
+    padding:4px 9px;border-radius:999px;background:var(--bg2);
+    border:1px solid var(--line);color:var(--dim);font-size:12.5px;
+    transition:.12s;user-select:none;
+  }
+  .chip:hover{border-color:var(--dim2);color:var(--fg)}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#1a1401;font-weight:600}
+  .chip em{font-style:normal;opacity:.55;margin-left:4px;font-size:11px}
+  .range{display:flex;align-items:center;gap:7px}
+  .range input[type=number]{
+    width:100%;padding:6px 8px;border-radius:8px;background:var(--bg2);
+    border:1px solid var(--line);color:var(--fg);outline:none;
+  }
+  .range input:focus{border-color:var(--accent)}
+  .range span{color:var(--dim2)}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .rowbtn{
+    width:100%;padding:7px;border-radius:8px;background:transparent;
+    border:1px dashed var(--line);color:var(--dim2);font-size:12.5px;
+  }
+  .rowbtn:hover{color:var(--accent);border-color:var(--accent)}
+
+  /* ---------- 海报墙 ---------- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:16px}
+  .card{
+    background:var(--card);border-radius:var(--radius);overflow:hidden;
+    border:1px solid transparent;transition:.15s;position:relative;
+  }
+  .card:hover{transform:translateY(-3px);border-color:var(--line);box-shadow:0 12px 28px -12px #000}
+  .poster{
+    aspect-ratio:2/3;width:100%;display:block;object-fit:cover;background:var(--card2);
+  }
+  .ph{
+    aspect-ratio:2/3;display:flex;align-items:center;justify-content:center;
+    padding:12px;text-align:center;font-size:13px;color:var(--dim);
+    background:linear-gradient(150deg,#232a34,#171c23);
+  }
+  .badge{
+    position:absolute;top:7px;right:7px;padding:2px 6px;border-radius:5px;
+    font-size:10.5px;font-weight:700;letter-spacing:.4px;
+    background:rgba(0,0,0,.62);color:#fff;backdrop-filter:blur(3px);
+  }
+  .badge.r4k{background:rgba(255,183,3,.92);color:#1a1401}
+  .rate{
+    position:absolute;top:7px;left:7px;padding:2px 6px;border-radius:5px;
+    font-size:11.5px;font-weight:700;background:rgba(0,0,0,.62);color:var(--accent);
+    backdrop-filter:blur(3px);
+  }
+  .meta{padding:9px 10px 11px}
+  .meta .t{font-size:13px;font-weight:600;line-height:1.35;margin:0 0 3px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .meta .s{font-size:11.5px;color:var(--dim2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card.todo{border:1px dashed #4a5261}
+  .card.todo .ph{background:repeating-linear-gradient(45deg,#1b2028,#1b2028 8px,#20262f 8px,#20262f 16px)}
+  .tag{position:absolute;bottom:62px;left:50%;transform:translateX(-50%);
+    background:var(--accent);color:#1a1401;font-size:11px;font-weight:700;
+    padding:3px 9px;border-radius:999px;white-space:nowrap}
+
+  /* ---------- 播放按钮 ---------- */
+  .playbtn{
+    position:absolute;left:0;right:0;top:0;bottom:62px;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.42);border:0;padding:0;
+    opacity:0;transition:.15s;z-index:3;
+  }
+  .card:hover .playbtn{opacity:1}
+  .playbtn i{
+    width:54px;height:54px;border-radius:50%;background:rgba(255,183,3,.95);
+    color:#1a1401;display:flex;align-items:center;justify-content:center;
+    font-size:20px;font-style:normal;padding-left:4px;
+    box-shadow:0 6px 20px -6px #000;
+  }
+  .frow{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #232a34}
+  .frow:first-child{border-top:0;padding-top:0}
+  .frow .fname{flex:1;word-break:break-all}
+  .btnplay{
+    flex:0 0 auto;padding:4px 12px;border-radius:7px;border:1px solid var(--accent);
+    background:transparent;color:var(--accent);font-size:12px;font-weight:600;
+  }
+  .btnplay:hover{background:var(--accent);color:#1a1401}
+  .btnmini{
+    flex:0 0 auto;padding:4px 9px;border-radius:7px;border:1px solid var(--line);
+    background:transparent;color:var(--dim);font-size:12px;
+  }
+  .btnmini:hover{color:var(--fg);border-color:var(--dim2)}
+  .btncopy{
+    flex:0 0 auto;padding:4px 12px;border-radius:7px;border:1px solid var(--line);
+    background:transparent;color:var(--dim);font-size:12px;
+  }
+  .btncopy:hover{color:var(--fg);border-color:var(--dim2)}
+  .btndel{
+    flex:0 0 auto;padding:4px 9px;border-radius:7px;border:1px solid #7a3b33;
+    background:transparent;color:#e5533d;font-size:12px;
+  }
+  .btndel:hover{background:#e5533d;color:#1a1401}
+  .btndelmovie{
+    padding:9px 16px;border-radius:9px;border:1px solid #7a3b33;
+    background:transparent;color:#e5533d;font-weight:600;font-size:13px;
+  }
+  .btndelmovie:hover{background:#e5533d;color:#1a1401}
+
+  /* ---------- 弹层 ---------- */
+  .mask{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:50;
+    display:none;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(3px)}
+  .mask.on{display:flex}
+  .sheet{
+    background:var(--bg2);border:1px solid var(--line);border-radius:16px;
+    max-width:820px;width:100%;max-height:88vh;overflow:auto;position:relative;
+  }
+  .sheet .inner{display:grid;grid-template-columns:220px 1fr;gap:22px;padding:24px}
+  .sheet img.poster{width:100%;border-radius:10px;aspect-ratio:2/3;object-fit:cover}
+  .sheet h2{margin:0 0 6px;font-size:21px;line-height:1.3}
+  .sheet .sub{color:var(--dim);font-size:13px;margin-bottom:12px}
+  .sheet .sub b{color:var(--accent);font-size:19px}
+  .sheet .tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+  .sheet .tags span{padding:2.5px 9px;border-radius:999px;background:var(--card2);
+    color:var(--dim);font-size:12px}
+  .sheet p.intro{color:#c8d0da;font-size:13.5px;line-height:1.75;margin:0 0 14px;white-space:pre-wrap}
+  .sheet dl{display:grid;grid-template-columns:64px 1fr;gap:5px 10px;font-size:13px;margin:0 0 14px}
+  .sheet dt{color:var(--dim2)}
+  .sheet dd{margin:0;color:#cfd6e0}
+  .files{background:var(--card);border-radius:9px;padding:10px 12px;font-size:12px;
+    color:var(--dim);word-break:break-all;line-height:1.7}
+  .files b{color:var(--fg);font-weight:600}
+  .close{position:absolute;top:12px;right:14px;background:none;border:0;color:var(--dim2);
+    font-size:26px;line-height:1;padding:2px 6px}
+  .close:hover{color:var(--fg)}
+
+  /* ---------- 网页播放层 ---------- */
+  .player{position:fixed;inset:0;background:#000;z-index:80;display:none;
+    flex-direction:column}
+  .player.on{display:flex}
+  .player .bar{display:flex;align-items:center;gap:12px;padding:10px 14px;
+    background:#11151a;border-bottom:1px solid var(--line);flex:0 0 auto}
+  .player .bar .nm{flex:1;font-size:13.5px;color:#dfe5ec;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .player .bar button{padding:6px 14px;border-radius:8px;border:1px solid var(--line);
+    background:transparent;color:var(--dim);font-size:13px}
+  .player .bar button:hover{color:var(--fg);border-color:var(--dim2)}
+  .player video{flex:1;width:100%;min-height:0;background:#000;outline:none}
+  .player .tip{padding:8px 14px;font-size:12px;color:#67717f;background:#11151a;
+    text-align:center}
+  /* 播放层的「外部播放器」/「本机播放器」按设备二选一：
+     电脑上「外部播放器」没意义，手机上的「本机播放器」会遥控电脑弹播放器，都不要显示 */
+  #playerOpenExt{display:none}
+  html.is-mobile #playerOpenExt{display:inline-block}
+  html.is-mobile #playerOpenLocal{display:none}
+  html.is-mobile .player .bar{gap:8px;padding:8px 10px}
+  html.is-mobile .player .bar button{padding:6px 10px;font-size:12px;white-space:nowrap}
+
+  /* ---------- 绑定搜索 ---------- */
+  .bindsearch{display:flex;gap:8px;margin-bottom:12px}
+  .bindsearch input{flex:1;padding:9px 11px;border-radius:9px;background:var(--card);
+    border:1px solid var(--line);color:var(--fg);outline:none}
+  .bindsearch input:focus{border-color:var(--accent)}
+  .btn{padding:9px 16px;border-radius:9px;background:var(--accent);border:0;
+    color:#1a1401;font-weight:700}
+  .btn.ghost{background:var(--card);color:var(--fg);border:1px solid var(--line);font-weight:500}
+  .cands{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+  .cand{background:var(--card);border:1px solid var(--line);border-radius:9px;
+    overflow:hidden;transition:.13s;cursor:pointer;text-align:left;padding:0}
+  .cand:hover{border-color:var(--accent)}
+  .cand img,.cand .ph{width:100%;aspect-ratio:2/3;object-fit:cover;display:block;font-size:11px}
+  .cand p{margin:6px 7px;font-size:11.5px;line-height:1.35;color:var(--dim);
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .hint{color:var(--dim2);font-size:12.5px;padding:8px 0}
+
+  .empty{padding:70px 20px;text-align:center;color:var(--dim2)}
+  .empty b{display:block;font-size:15px;color:var(--dim);margin-bottom:6px}
+  @media(max-width:820px){
+    .wrap{grid-template-columns:1fr}
+    aside{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line)}
+    .sheet .inner{grid-template-columns:1fr}
+    .sheet img.poster{max-width:180px;margin:0 auto}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>我的<span>电影库</span></h1>
+  <div class="search"><input id="q" placeholder="搜索片名 / 导演 / 演员 / 英文名"></div>
+  <div class="stat" id="stat"></div>
+</header>
+
+<div class="wrap">
+  <aside>
+    <div class="fgroup">
+      <h3>排序</h3>
+      <div class="chips" id="sortChips"></div>
+    </div>
+    <div class="fgroup">
+      <h3>豆瓣评分 ≥ <b id="rateVal">0</b></h3>
+      <input type="range" id="rate" min="0" max="9.5" step="0.5" value="0">
+    </div>
+    <div class="fgroup">
+      <h3>类型</h3>
+      <div class="chips" id="genreChips"></div>
+    </div>
+    <div class="fgroup">
+      <h3>国家 / 地区</h3>
+      <div class="chips" id="countryChips"></div>
+    </div>
+    <div class="fgroup">
+      <h3>年份</h3>
+      <div class="range">
+        <input type="number" id="y1" placeholder="起" min="1900" max="2030">
+        <span>—</span>
+        <input type="number" id="y2" placeholder="止" min="1900" max="2030">
+      </div>
+    </div>
+    <div class="fgroup">
+      <h3>片长（分钟）</h3>
+      <div class="range">
+        <input type="number" id="d1" placeholder="最短" min="0" max="600">
+        <span>—</span>
+        <input type="number" id="d2" placeholder="最长" min="0" max="600">
+      </div>
+    </div>
+    <div class="fgroup">
+      <h3>状态</h3>
+      <div class="chips" id="statusChips"></div>
+    </div>
+    <button class="rowbtn" id="reset">清空全部筛选</button>
+    <button class="rowbtn" id="manage" style="margin-top:10px">⚙ 管理电影目录 / 重新扫描</button>
+  </aside>
+
+  <main>
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="empty" style="display:none"><b>没有符合条件的影片</b>试试放宽筛选条件</div>
+  </main>
+</div>
+
+<div class="mask" id="mask"><div class="sheet" id="sheet"></div></div>
+
+<div class="player" id="player">
+  <div class="bar">
+    <span class="nm" id="playerName"></span>
+    <button id="playerOpenExt" title="用手机上的播放器打开（VLC / MX Player 等）">外部播放器</button>
+    <button id="playerOpenLocal" title="用电脑上的播放器打开">本机播放器</button>
+    <button id="playerCopyLink" title="复制播放链接（可粘进手机播放器打开）">复制链接</button>
+    <button id="playerClose">关闭 ✕</button>
+  </div>
+  <video id="playerVideo" controls autoplay playsinline></video>
+  <div class="tip" id="playerTip">若画面出不来，说明浏览器不支持该格式（常见于 .mkv / H.265）——请改用「本机播放器」，或用手机上的 VLC 打开</div>
+</div>
+
+<script>
+const S = {
+  all: [], facets: { genres: [], countries: [] },
+  q: '', sort: 'rating',
+  rate: 0, genres: new Set(), countries: new Set(), status: new Set(),
+  y1: null, y2: null, d1: null, d2: null,
+};
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** 往管理面板的提示区写内容：面板随时可能被关掉，所以这里必须判空 */
+function mgTxt(id, text) { const el = $(id); if (el) el.textContent = text; }
+function mgHTML(id, html) { const el = $(id); if (el) el.innerHTML = html; }
+
+/** 收集「电影目录」区里填写的目录；面板没打开时返回 null */
+function readDirInputs() {
+  const list = $('dirList');
+  if (!list) return null;
+  return [...list.querySelectorAll('.dirinput')].map((i) => i.value.trim()).filter(Boolean);
+}
+
+// 手机 / 平板判定：playSmart 的走向和「外部播放器」按钮的显隐都靠它
+const UA = navigator.userAgent || '';
+const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile|HarmonyOS/i.test(UA);
+if (IS_MOBILE) document.documentElement.classList.add('is-mobile');
+const bytes = (b) => { const u=['B','KB','MB','GB','TB']; let i=0,n=b||0; while(n>=1024&&i<u.length-1){n/=1024;i++;} return (i<2?n.toFixed(0):n.toFixed(2))+' '+u[i]; };
+const minutes = (m) => { for (const d of (m.durations||[])) { const x=String(d).match(/(\d+)/); if(x) return parseInt(x[1],10);} return null; };
+
+// ---------------------------------------------------------------- 加载
+async function load() {
+  const r = await fetch('/api/library');
+  const data = await r.json();
+  S.all = data.movies || [];
+  S.facets = data.facets || { genres: [], countries: [] };
+  buildFilterUI(data);
+  render();
+}
+
+function buildFilterUI(data) {
+  $('stat').innerHTML = '共 <b>' + S.all.length + '</b> 部'
+    + (data.generatedAt ? ' · 数据 ' + data.generatedAt.slice(0,10) : '');
+
+  const sorts = [['rating','评分最高'],['year','年份最新'],['size','文件最大'],['title','按片名']];
+  $('sortChips').innerHTML = sorts.map(([k,t]) =>
+    '<span class="chip' + (S.sort===k?' on':'') + '" data-sort="' + k + '">' + t + '</span>').join('');
+
+  $('genreChips').innerHTML = S.facets.genres.slice(0, 24).map((g) =>
+    '<span class="chip" data-genre="' + esc(g.name) + '">' + esc(g.name) + '<em>' + g.count + '</em></span>').join('');
+  $('countryChips').innerHTML = S.facets.countries.slice(0, 18).map((c) =>
+    '<span class="chip" data-country="' + esc(c.name) + '">' + esc(c.name) + '<em>' + c.count + '</em></span>').join('');
+
+  const st = { ok:'已匹配', needsConfirm:'待确认', unmatched:'未匹配' };
+  $('statusChips').innerHTML = Object.entries(st).map(([k,t]) => {
+    const n = S.all.filter((m) => m.status === k).length;
+    return '<span class="chip" data-status="' + k + '">' + t + '<em>' + n + '</em></span>';
+  }).join('');
+}
+
+// ---------------------------------------------------------------- 筛选
+function filtered() {
+  const q = S.q.trim().toLowerCase();
+  let list = S.all.filter((m) => {
+    if (S.rate > 0 && !(m.rating >= S.rate)) return false;
+    if (S.genres.size && !m.genres.some((g) => S.genres.has(g))) return false;
+    if (S.countries.size && !m.countries.some((c) => S.countries.has(c))) return false;
+    if (S.status.size && !S.status.has(m.status)) return false;
+    if (S.y1 && !(m.year >= S.y1)) return false;
+    if (S.y2 && !(m.year <= S.y2)) return false;
+    const mm = minutes(m);
+    if (S.d1 && !(mm >= S.d1)) return false;
+    if (S.d2 && !(mm <= S.d2)) return false;
+    if (q) {
+      const hay = [m.title, m.cn, m.en, m.dirName, ...(m.directors||[]), ...(m.actors||[])].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const by = {
+    rating: (a,b) => (b.rating||0)-(a.rating||0) || (b.ratingCount||0)-(a.ratingCount||0),
+    year:   (a,b) => (b.year||0)-(a.year||0),
+    size:   (a,b) => (b.size||0)-(a.size||0),
+    title:  (a,b) => String(a.title).localeCompare(String(b.title),'zh'),
+  }[S.sort];
+  return list.sort(by);
+}
+
+function posterHTML(m, cls) {
+  if (m.poster) return '<img class="' + (cls || 'poster') + '" loading="lazy" src="/' + esc(m.poster) + '" alt="">';
+  return '<div class="' + (cls === 'poster' ? 'ph' : cls || 'ph') + '">' + esc(m.title) + '</div>';
+}
+
+function render() {
+  // 片库还是空的 → 引导去配置目录
+  if (!S.all.length) {
+    $('stat').innerHTML = '暂无影片';
+    $('grid').innerHTML = '';
+    $('empty').style.display = 'block';
+    $('empty').innerHTML = '<b>片库还是空的</b>'
+      + '先点左下角「⚙ 管理电影目录」添加你的电影目录，再点「开始扫描」<br>'
+      + '<button class="btn" id="emptyManage" style="margin-top:14px">⚙ 添加电影目录</button>';
+    const b = $('emptyManage');
+    if (b) b.onclick = openManage;
+    return;
+  }
+
+  const list = filtered();
+  $('stat').innerHTML = '显示 <b>' + list.length + '</b> / ' + S.all.length + ' 部';
+  $('empty').style.display = list.length ? 'none' : 'block';
+  if (!list.length) {
+    $('empty').innerHTML = '<b>没有符合条件的影片</b>试试放宽筛选条件';
+  }
+  $('grid').innerHTML = list.map((m) => {
+    const todo = m.status !== 'ok';
+    const r4k = /2160|4K/i.test(m.res || '');
+    const sub = [m.year || '—', (m.genres||[])[0] || (todo ? '待补全资料' : '')].filter(Boolean).join(' · ');
+    const first = (m.versions && m.versions.length) ? m.versions[0].file : '';
+    const more = (m.versions || []).length > 1 ? ' <span style="color:#ffb703">x' + m.versions.length + '</span>' : '';
+    return '<div class="card' + (todo ? ' todo' : '') + '" data-key="' + esc(m.key) + '">'
+      + posterHTML(m)
+      + (m.rating != null ? '<div class="rate">★ ' + m.rating + '</div>' : '')
+      + (m.res ? '<div class="badge' + (r4k ? ' r4k' : '') + '">' + esc(m.res) + '</div>' : '')
+      + (todo ? '<div class="tag">待确认</div>' : '')
+      + (first ? '<button class="playbtn" data-smartplay="' + esc(first) + '" title="播放"><i>▶</i></button>' : '')
+      + '<div class="meta"><p class="t">' + esc(m.title) + '</p><p class="s">' + esc(sub) + more + '</p></div>'
+      + '</div>';
+  }).join('');
+}
+
+// ---------------------------------------------------------------- 详情
+function findMovie(key) { return S.all.find((m) => m.key === key); }
+
+function openSheet(m) {
+  const todo = m.status !== 'ok';
+  const mins = minutes(m);
+  const rows = [];
+  if (m.year) rows.push(['年份', m.year]);
+  if (mins) rows.push(['片长', mins + ' 分钟']);
+  if (m.countries && m.countries.length) rows.push(['产地', m.countries.join(' / ')]);
+  if (m.directors && m.directors.length) rows.push(['导演', m.directors.join(' / ')]);
+  if (m.actors && m.actors.length) rows.push(['主演', m.actors.slice(0, 6).join(' / ')]);
+
+  $('sheet').innerHTML =
+    '<button class="close" id="closeBtn">×</button>'
+    + '<div class="inner">'
+    +   '<div>' + posterHTML(m) + '</div>'
+    +   '<div>'
+    +     '<h2>' + esc(m.title) + (m.en ? ' <span style="font-size:13px;color:#67717f;font-weight:400">' + esc(m.en) + '</span>' : '') + '</h2>'
+    +     '<div class="sub">'
+    +       (m.rating != null ? '<b>★ ' + m.rating + '</b> ' + (m.ratingCount ? '<span style="color:#67717f">（' + m.ratingCount.toLocaleString() + ' 人评）</span>' : '') : '<span style="color:#67717f">暂无评分</span>')
+    +       (m.confidence ? ' <span style="color:#67717f">· 匹配置信度 ' + esc(m.confidence) + '</span>' : '')
+    +     '</div>'
+    +     ((m.genres||[]).length ? '<div class="tags">' + m.genres.map((g) => '<span>' + esc(g) + '</span>').join('') + '</div>' : '')
+    +     (m.intro ? '<p class="intro">' + esc(m.intro) + '</p>' : '<p class="hint">还没有简介</p>')
+    +     (rows.length ? '<dl>' + rows.map(([k,v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('') + '</dl>' : '')
+    +     '<div class="files">' + m.versions.map((v) =>
+            '<div class="frow">'
+            + '<span class="fname"><b>' + bytes(v.size) + '</b> · ' + esc(v.fileName) + '</span>'
+            + '<button class="btnplay" data-smartplay="' + esc(v.file) + '" title="播放">▶ 播放</button>'
+            + '<button class="btncopy" data-copylink="' + esc(v.file) + '" title="复制播放链接">复制链接</button>'
+            + ((m.versions || []).length > 1
+                ? '<button class="btndel" data-delfile="' + esc(v.file) + '" data-delsize="' + (v.size || 0)
+                  + '" title="只删掉这一个版本（移到回收区）">🗑</button>'
+                : '')
+            + '</div>'
+          ).join('') + '<div style="margin-top:8px;color:#4a5261">' + esc(m.dirName) + '</div></div>'
+    +     ((m.versions && m.versions.length)
+            ? '<div style="margin-top:16px"><button class="btndelmovie" id="delMovie">🗑 删除这部电影'
+              + (m.versions.length > 1 ? '（全部 ' + m.versions.length + ' 个文件）' : '')
+              + '</button></div>'
+            : '')
+    +     (todo ? '<div style="margin-top:10px"><button class="btn" data-bind="' + esc(m.key) + '">手动搜索豆瓣条目</button></div>' : '')
+    +     (todo ? ''
+            : '<div style="margin-top:10px"><button class="btn ghost" data-bind="' + esc(m.key)
+              + '">重新匹配豆瓣条目</button></div>')
+    +   '</div>'
+    + '</div>';
+  $('mask').classList.add('on');
+
+  $('closeBtn').onclick = closeSheet;
+  const b = $('sheet').querySelector('[data-bind]');
+  if (b) b.onclick = () => openBind(m);
+  const dm = $('delMovie');
+  if (dm) dm.onclick = () => deleteMovie(m);
+}
+
+function closeSheet() { $('mask').classList.remove('on'); }
+
+// ---------------------------------------------------------------- 播放 / 定位
+async function playFile(file, btn) {
+  const label = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '打开中…'; }
+  try {
+    const r = await fetch('/api/play', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file }),
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || '播放失败');
+    if (btn) {
+      btn.textContent = '已打开';
+      setTimeout(() => { btn.disabled = false; btn.textContent = label; }, 1600);
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+    alert('播放失败：' + e.message);
+  }
+}
+
+async function revealFile(file) {
+  try {
+    const r = await fetch('/api/reveal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file }),
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || '定位失败');
+  } catch (e) { alert('定位失败：' + e.message); }
+}
+
+// ---------------------------------------------------------------- 网页内播放
+let playerFile = '';
+
+/** 播放层底部提示的默认文案（手机和电脑的出路不一样） */
+function defaultTip() {
+  return IS_MOBILE
+    ? '手机浏览器多半放不了 .mkv / H.265——点上方「外部播放器」唤起手机上的播放器，或用「复制链接」粘进 VLC。'
+    : '若画面出不来，说明浏览器不支持该格式（常见于 .mkv / H.265）——请改用「本机播放器」。';
+}
+
+function openPlayer(file, title) {
+  if (!file) return;
+  closeSheet();
+  playerFile = file;
+  $('playerName').textContent = title || file.split(/[\\/]/).pop();
+  const tip = $('playerTip');
+  tip.style.color = '';                  // 清掉上一次失败提示留下的红色
+  tip.textContent = defaultTip();
+  $('playerVideo').src = '/api/stream?file=' + encodeURIComponent(file);
+  $('player').classList.add('on');
+}
+
+function closePlayer() {
+  const v = $('playerVideo');
+  try { v.pause(); } catch { /* ignore */ }
+  v.removeAttribute('src');
+  try { v.load(); } catch { /* ignore */ }
+  $('player').classList.remove('on');
+  playerFile = '';
+}
+
+$('playerClose').onclick = closePlayer;
+$('playerOpenLocal').onclick = () => { if (playerFile) playFile(playerFile, null); };
+$('playerOpenExt').onclick = () => { if (playerFile) openExternal(playerFile, true); };
+$('playerCopyLink').onclick = () => { if (playerFile) copyLink(playerFile, $('playerCopyLink')); };
+$('playerVideo').onerror = () => {
+  const tip = $('playerTip');
+  tip.style.color = '#e5533d';
+  tip.textContent = IS_MOBILE
+    ? '浏览器放不了这个格式（多半是 .mkv 或 H.265）。点上方「外部播放器」调手机上的播放器打开。'
+    : '这个格式浏览器放不了（多半是 .mkv 或 H.265）。请用「本机播放器」调电脑上的播放器打开。';
+};
+
+// ---------------------------------------------------------------- 调用外部播放器
+function streamUrl(file) {
+  return location.origin + '/api/stream?file=' + encodeURIComponent(file);
+}
+
+/**
+ * 唤起失败时怎么办。两种来路要区别对待：
+ *   - 自动进来的（从海报 ▶ 点播放）：退到网页播放层，至少让用户看到东西
+ *   - 手动重试的（在播放层里点「外部播放器」）：**绝不能重开播放层**，
+ *     否则视频会重新加载，看起来就是「点了没反应、还重播了一遍」
+ */
+function onExternalFail(file, manual) {
+  if (manual && $('player').classList.contains('on')) setFailTip(true, file);
+  else { openPlayer(file); setFailTip(false, file); }
+}
+
+/** 播放层底部的失败提示（红色），并附一行 UA——用来判断是浏览器不认 intent 还是手机没装播放器 */
+function setFailTip(manual, file) {
+  const tip = $('playerTip');
+  tip.textContent = '';
+  tip.style.color = '#e5533d';
+  tip.appendChild(document.createTextNode(
+    (manual ? '还是没唤起。' : '没唤起手机上的播放器。')
+    + '多半是手机里没装视频播放器——装一个 VLC 之后就会好用；'
+    + '也可以直接在这里看，或点「复制链接」把链接粘进播放器打开。'));
+
+  // 装了 VLC 的话，vlc:// 这条路比 intent:// 更直接。
+  // 放在这里点=真实手指手势，比 setTimeout 里的跳转更容易被浏览器放行。
+  if (IS_MOBILE) {
+    const bar = document.createElement('div');
+    bar.style.cssText = 'margin-top:8px';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = '用 VLC 打开';
+    b.style.cssText = 'padding:5px 13px;border-radius:7px;border:1px solid #e5533d;'
+      + 'background:transparent;color:#e5533d;font-size:12px';
+    b.onclick = () => { try { location.href = 'vlc://' + streamUrl(file); } catch { /* ignore */ } };
+    bar.appendChild(b);
+    tip.appendChild(bar);
+  }
+
+  const ua = document.createElement('div');
+  ua.style.cssText = 'margin-top:5px;font-size:10.5px;color:#5c6673;word-break:break-all';
+  ua.textContent = '浏览器信息：' + UA;
+  tip.appendChild(ua);
+}
+
+/**
+ * 唤起外部播放器后系统会把这个页面切到后台，所以「到底唤起了没有」只能靠
+ * 页面可见性判断：1.2 秒后如果本页还显示着，就说明没唤起成功
+ *   （手机没装能处理 video/* 的播放器 / 浏览器不支持 intent:// / 被拦了）。
+ */
+let extFallbackTimer = null;
+function armFallback(file, manual) {
+  clearTimeout(extFallbackTimer);
+  const onHide = () => {
+    if (document.visibilityState === 'hidden') {      // 成功跳走了
+      clearTimeout(extFallbackTimer);
+      extFallbackTimer = null;
+      document.removeEventListener('visibilitychange', onHide);
+    }
+  };
+  document.addEventListener('visibilitychange', onHide);
+  extFallbackTimer = setTimeout(() => {
+    extFallbackTimer = null;
+    document.removeEventListener('visibilitychange', onHide);
+    if (document.visibilityState === 'visible') onExternalFail(file, manual);
+  }, 1200);
+}
+
+/**
+ * 交给手机上的外部播放器打开（VLC、MX Player…）
+ *  - Android：用 intent:// 唤起系统「打开方式」选择器
+ *             ★ 这里必须**手机里真的装了**能处理 video/* 的播放器才会弹选择器，
+ *               没装的话系统无人可接，就是静默失败（手机端最常见的坑）
+ *  - iOS    ：用 vlc:// 协议唤起 VLC
+ *
+ * ★ 不能用 try/catch + setTimeout 兜底：给 location.href 赋值**不会抛异常**，
+ *   没有任何 App 能接 intent 时也只是静默失败，那段兜底永远执行不到，
+ *   表现就是「点了播放完全没反应」。必须靠上面的页面可见性检测。
+ */
+function openExternal(file, manual) {
+  if (!file) return;
+  const httpUrl = streamUrl(file);
+  let target = '';
+
+  if (/Android/i.test(UA)) {
+    const m = httpUrl.match(/^https?:\/\/([^/]+)(\/.*)$/);
+    if (m) {
+      target = 'intent://' + m[1] + m[2]
+        + '#Intent;scheme=http;action=android.intent.action.VIEW;type=video/*;end';
+    }
+  } else if (/iPhone|iPad|iPod|Macintosh/i.test(UA)) {
+    target = 'vlc://' + httpUrl;
+  }
+
+  if (!target) { onExternalFail(file, manual); return; }   // 浏览器连 intent 都不支持
+
+  armFallback(file, manual);
+  try { location.href = target; }
+  catch { clearTimeout(extFallbackTimer); onExternalFail(file, manual); }
+}
+
+/**
+ * 唯一的「▶ 播放」入口，按设备自动选择：
+ *   - 电脑浏览器  → 调本机播放器（openWithPlayer，走 /api/play）
+ *   - 手机 / 平板 → 唤起手机上的播放器（openExternal），唤不起就退到网页播放
+ */
+function playSmart(file) {
+  if (!file) return;
+  if (IS_MOBILE) openExternal(file);
+  else playFile(file, null);
+}
+
+/** 复制播放链接（给手动在播放器里粘贴的用户） */
+async function copyLink(file, btn) {
+  const url = streamUrl(file);
+  const label = btn ? btn.textContent : '';
+  let ok = false;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(url);
+      ok = true;
+    }
+  } catch { /* ignore */ }
+  if (!ok) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch { ok = false; }
+  }
+  if (btn) {
+    btn.textContent = ok ? '已复制' : '复制失败';
+    setTimeout(() => { btn.textContent = label; }, 1600);
+  }
+  if (!ok) window.prompt('手动复制这个链接：', url);
+}
+
+// ---------------------------------------------------------------- 管理目录 / 重新扫描
+let scanPolling = false;
+
+async function openManage() {
+  $('sheet').innerHTML =
+    '<button class="close" id="closeBtn">×</button>'
+    + '<div class="inner" style="grid-template-columns:1fr">'
+    +   '<div>'
+    +     '<h2 style="font-size:18px">电影目录</h2>'
+    +     '<p class="hint">每行一个目录（你的电影库根目录）。加好之后，直接点下面的「📥 抓取资料」——'
+    +       '它会自动帮你保存目录、扫描，然后再抓海报和评分。</p>'
+    +     '<div id="dirList"></div>'
+    +     '<button class="rowbtn" id="addDir" style="margin-top:6px">＋ 添加一个目录</button>'
+    +     '<div style="margin-top:14px">'
+    +       '<button class="btn ghost" id="startScan">仅扫描（只更新片库列表，不抓资料）</button>'
+    +     '</div>'
+    +     '<div id="mgrMsg" class="hint"></div>'
+    +     '<div id="scanBox" class="hint"></div>'
+    +     '<hr style="border:0;border-top:1px solid var(--line);margin:18px 0">'
+    +     '<h2 style="font-size:18px">豆瓣资料</h2>'
+    +     '<p class="hint">「抓取资料」会自动完成：保存目录 → 扫描 → 抓海报/评分/简介。'
+    +       '跑的时候可以随时停，进度会保存，下次接着跑。</p>'
+    +     '<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">'
+    +       '<button class="btn" id="startFetch">📥 抓取资料</button>'
+    +       '<button class="btn ghost" id="rematch">🔧 修正错配</button>'
+    +       '<button class="btn ghost" id="stopFetch" style="display:none">停止抓取</button>'
+    +     '</div>'
+    +     '<p class="hint" style="font-size:11.5px">「修正错配」用来处理这种情况：'
+    +       '同一个目录里的几部片（比如合集）被错认成同一部电影，重新匹配一遍。</p>'
+    +     '<div id="fetchBox" class="hint"></div>'
+    +     '<hr style="border:0;border-top:1px solid var(--line);margin:18px 0">'
+    +     '<h2 style="font-size:18px">同一部片的多条记录</h2>'
+    +     '<p class="hint">同一个豆瓣电影被好几条记录指着 —— 多半是同一部片的不同版本，'
+    +       '只是目录名一个正常、一个是拼音缩写，扫描时没认出来。'
+    +       '合并后列表里只显示一条，各个文件在详情页里都能看到（<b>不会删任何文件</b>）。</p>'
+    +     '<div style="margin-top:10px"><button class="btn ghost" id="findMerges">🔗 查找同一部片的多条记录</button></div>'
+    +     '<div id="mergeBox" style="margin-top:12px"></div>'
+    +     '<hr style="border:0;border-top:1px solid var(--line);margin:18px 0">'
+    +     '<h2 style="font-size:18px">重复文件</h2>'
+    +     '<p class="hint">同一部片有多个文件时会列在这里（比如同时留了 4K 和 1080p）。'
+    +       '勾选要清理的，点清理 —— 文件会被<b>移动到同盘的 <code>_movie-lib_deleted</code> 文件夹</b>，'
+    +       '不是真删除，随时可以拷回来。</p>'
+    +     '<div style="margin-top:10px"><button class="btn ghost" id="findDup">🔍 查找重复文件</button></div>'
+    +     '<div id="dupBox" style="margin-top:12px"></div>'
+    +     '<div style="margin-top:10px"><button class="btn" id="doDelete" style="display:none">🧹 清理选中（移到 _movie-lib_deleted）</button></div>'
+    +     '<hr style="border:0;border-top:1px solid var(--line);margin:18px 0">'
+    +     '<h2 style="font-size:18px">文件回收区</h2>'
+    +     '<p class="hint">删掉的电影会先挪到这里（同盘改名，随时能还原）。'
+    +       '想真正释放硬盘空间就清空它 —— <b>清空是彻底删除，救不回来</b>。</p>'
+    +     '<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">'
+    +       '<button class="btn ghost" id="findTrash">🔍 查看回收区</button>'
+    +       '<button class="btn" id="purgeTrash" style="display:none;background:#e5533d;color:#fff">🗑 清空回收区（彻底删除）</button>'
+    +     '</div>'
+    +     '<div id="trashBox" style="margin-top:12px"></div>'
+    +   '</div>'
+    + '</div>';
+  $('mask').classList.add('on');        // ← 让弹层显示出来（之前漏了这行）
+  $('closeBtn').onclick = closeSheet;
+
+  const list = $('dirList');
+
+  const addRow = (val) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;margin-bottom:6px';
+    const inp = document.createElement('input');
+    inp.className = 'dirinput';
+    inp.value = val || '';
+    inp.placeholder = '例如  D:\\Movies   或  E:/电影';
+    inp.style.cssText = 'flex:1;padding:8px 10px;border-radius:8px;background:var(--card);'
+      + 'border:1px solid var(--line);color:var(--fg);outline:none';
+    const del = document.createElement('button');
+    del.className = 'btnmini';
+    del.style.cssText = 'padding:8px 12px;flex:0 0 auto';
+    del.textContent = '删除';
+    del.onclick = () => row.remove();
+    row.appendChild(inp);
+    row.appendChild(del);
+    list.appendChild(row);
+  };
+
+  try {
+    const r = await fetch('/api/config');
+    const d = await r.json();
+    const dirs = d.movieDirs || [];
+    if (dirs.length) dirs.forEach(addRow); else addRow('');
+  } catch { addRow(''); }
+
+  $('addDir').onclick = () => addRow('');
+
+  $('startScan').onclick = async () => {
+    mgTxt('scanBox', '正在启动扫描…');
+    try {
+      const r = await fetch('/api/scan', { method: 'POST' });
+      const d = await r.json();
+      if (!d.ok) { mgTxt('scanBox', d.error || '启动失败'); return; }
+      pollScan();
+    } catch (e) { mgTxt('scanBox', '启动失败：' + e.message); }
+  };
+
+  $('startFetch').onclick = () => startAll();
+  $('stopFetch').onclick = async () => {
+    try {
+      await fetch('/api/fetch/stop', { method: 'POST' });
+      $('fetchBox').textContent = '已发送停止指令…';
+      setTimeout(pollFetch, 800);
+    } catch (e) { $('fetchBox').textContent = '停止失败：' + e.message; }
+  };
+  $('findMerges').onclick = findMerges;
+  $('findDup').onclick = findDuplicates;
+  $('findTrash').onclick = findTrash;
+  $('purgeTrash').onclick = purgeTrash;
+  $('doDelete').onclick = doDeleteSelected;
+  $('rematch').onclick = () => {
+    if (!confirm('「修正错配」会重新匹配所有『疑似错配』的条目：\n\n'
+      + '  · 多个本地条目指向同一部电影（例如合集里几部片名字相同）\n'
+      + '  · 本地年份和豆瓣年份差得较多的\n\n'
+      + '只重抓这些条目，其它已正确的不会动。确定继续吗？')) return;
+    doFetch(false, true);
+  };
+  pollFetch();
+}
+
+// ---------------------------------------------------------------- 删除电影（移到回收区）
+/** 删掉一部电影的全部文件（其实只是挪到回收区，不是真删） */
+async function deleteMovie(m) {
+  const files = (m.versions || []).map((v) => v.file).filter(Boolean);
+  if (!files.length) return;
+  const total = (m.versions || []).reduce((s, v) => s + (v.size || 0), 0);
+  const name = '《' + (m.title || '这个条目') + '》';
+  await deleteFiles(files, files.length > 1
+    ? name + '的全部 ' + files.length + ' 个文件（共 ' + bytes(total) + '）'
+    : name + '（' + bytes(total) + '）');
+}
+
+/**
+ * 把文件移出片库。注意：**只是同盘改名到 _movie-lib_deleted，文件还在硬盘上**，
+ * 真想释放空间得去「文件回收区」清空。这样删错了还救得回来。
+ */
+async function deleteFiles(files, desc) {
+  if (!files || !files.length) return;
+  if (!confirm('确定要删除 ' + desc + ' 吗？\n\n'
+    + '· 文件会被移到同盘的 _movie-lib_deleted 文件夹，不是真删除\n'
+    + '· 片库里会立刻消失；想还原就用资源管理器把它拷回原位\n'
+    + '· 想真正释放硬盘空间：去「⚙ 管理电影目录 → 文件回收区」里清空\n\n'
+    + '继续吗？')) return;
+
+  const btn = $('delMovie');
+  if (btn) { btn.disabled = true; btn.textContent = '正在移出…'; }
+  try {
+    const r = await fetch('/api/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files }),
+    });
+    const d = await r.json();
+    const moved = (d.deleted || []).length;
+    const failed = (d.failed || []).length;
+    if (!moved) throw new Error((d.failed && d.failed[0] && d.failed[0].error) || '没有文件被移出');
+    const targets = [...new Set((d.deleted || [])
+      .map((x) => String(x.movedTo || '').replace(/[\\/][^\\/]*$/, '')))];
+    alert('✅ 已移出片库：' + moved + ' 个文件' + (failed ? '（另有 ' + failed + ' 个失败）' : '')
+      + '\n\n文件挪到了这里，想要就自己拷回去：\n' + targets.map((t) => '  ' + t).join('\n')
+      + '\n\n想真正释放空间 → 「⚙ 管理电影目录」→「文件回收区」→ 清空');
+    closeSheet();
+    await load();       // 后端已经顺手把这条从片库数据里摘掉了，直接刷新就行
+  } catch (e) {
+    alert('删除失败：' + e.message);
+    if (btn) { btn.disabled = false; }
+  }
+}
+
+// ---------------------------------------------------------------- 文件回收区
+async function findTrash() {
+  mgHTML('trashBox', '<p class="hint">正在统计…</p>');
+  try {
+    const r = await fetch('/api/trash');
+    const d = await r.json();
+    renderTrash(d);
+  } catch (e) {
+    mgHTML('trashBox', '<p class="hint" style="color:#e5533d">统计失败：' + esc(e.message) + '</p>');
+  }
+}
+
+function renderTrash(data) {
+  const btn = $('purgeTrash');
+  const dirs = (data && data.dirs) || [];
+  if (!data || !data.count) {
+    mgHTML('trashBox', '<p class="hint">回收区是空的。</p>');
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  mgHTML('trashBox', dirs.map((d) => {
+    const shown = d.files.slice(0, 30);
+    return '<div style="background:var(--card);border-radius:9px;padding:10px 12px;margin-bottom:10px">'
+      + '<div style="font-weight:600">' + esc(d.dir) + '</div>'
+      + '<div style="color:#67717f;font-size:12px;margin-top:2px">'
+      + d.count + ' 个文件 · ' + bytes(d.bytes) + '</div>'
+      + shown.map((f) =>
+          '<div style="color:#67717f;font-size:11.5px;padding-left:10px;word-break:break-all">'
+          + bytes(f.size) + ' · ' + esc(f.file.slice(d.dir.length + 1)) + '</div>').join('')
+      + (d.count > shown.length
+          ? '<div style="color:#5c6673;font-size:11.5px;padding-left:10px">…另有 '
+            + (d.count - shown.length) + ' 个</div>'
+          : '')
+      + '</div>';
+  }).join('') + '<p class="hint">合计 <b>' + data.count + '</b> 个文件 · <b>' + bytes(data.bytes)
+    + '</b>。清空后能释放这么多空间。</p>');
+  if (btn) btn.style.display = '';
+}
+
+async function purgeTrash() {
+  let desc = '回收区里的所有文件';
+  try {
+    const t = await (await fetch('/api/trash')).json();
+    if (t && t.count) desc = t.count + ' 个文件（' + bytes(t.bytes) + '）';
+  } catch { /* ignore */ }
+  if (!confirm('即将【彻底删除】' + desc + '。\n\n'
+    + '· 这一步不可恢复，文件真的会从硬盘上消失\n'
+    + '· 硬盘空间会立刻释放出来\n'
+    + '· 如果你其实只是想还原：取消，然后用资源管理器把 _movie-lib_deleted 里的东西拷回原位\n\n'
+    + '确定要彻底删除吗？')) return;
+
+  const btn = $('purgeTrash');
+  if (btn) { btn.disabled = true; btn.textContent = '正在删除…'; }
+  try {
+    const r = await fetch('/api/purge', { method: 'POST' });
+    const d = await r.json();
+    const n = (d.removed || []).reduce((s, x) => s + x.count, 0);
+    const b = (d.removed || []).reduce((s, x) => s + x.bytes, 0);
+    alert('✅ 已彻底删除 ' + n + ' 个文件，释放了 ' + bytes(b) + '。'
+      + ((d.failed && d.failed.length)
+          ? '\n\n有 ' + d.failed.length + ' 个目录没删掉：\n'
+            + d.failed.map((x) => x.dir + '：' + x.error).join('\n')
+          : ''));
+    await findTrash();
+  } catch (e) {
+    alert('清空失败：' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🗑 清空回收区（彻底删除）'; }
+  }
+}
+
+// ---------------------------------------------------------------- 同一部片的多条记录
+async function findMerges() {
+  mgHTML('mergeBox', '<p class="hint">正在查找…</p>');
+  try {
+    const r = await fetch('/api/merges');
+    const d = await r.json();
+    renderMerges(d);
+  } catch (e) {
+    mgHTML('mergeBox', '<p class="hint" style="color:#e5533d">查找失败：' + esc(e.message) + '</p>');
+  }
+}
+
+function renderMerges(data) {
+  const groups = (data && data.groups) || [];
+  if (!groups.length) {
+    mgHTML('mergeBox', '<p class="hint">✅ 没有发现同一部片的多条记录。</p>');
+    return;
+  }
+  mgHTML('mergeBox', groups.map((g) => {
+    const nfiles = g.records.reduce((s, r) => s + r.files.length, 0);
+    // 本地年份对不上 → 大概率是「不同的片子被错配到同一部豆瓣电影」，不是同一部片的两个版本
+    const yrs = g.records.map((r) => r.year).filter(Boolean);
+    const yearMismatch = yrs.length === g.records.length && new Set(yrs).size > 1;
+    return '<div style="background:var(--card);border-radius:9px;padding:10px 12px;margin-bottom:10px">'
+      + '<div style="font-weight:600">' + esc(g.title)
+      + (g.year ? ' <span style="color:#67717f;font-weight:400">' + g.year + '</span>' : '')
+      + ' <span style="color:#67717f;font-weight:400">· ' + g.records.length + ' 条记录 / '
+      + nfiles + ' 个文件</span></div>'
+      + g.records.map((rec) =>
+          '<div style="padding:6px 0;border-top:1px solid #232a34;font-size:12px">'
+          + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+          +   '<span>本地「' + esc(rec.cn || rec.en || '?') + '」'
+          +   (rec.year ? ' <span style="color:#67717f">' + rec.year + '</span>' : '')
+          +   (rec.manual ? ' <span style="color:#ffb703">★手动绑定</span>' : '')
+          +   '</span>'
+          +   '<button class="btnmini" data-rebind="' + esc(rec.key) + '"'
+          +     ' title="这条可能配错了，重新搜一部正确的绑上去">手动搜索豆瓣条目</button>'
+          + '</div>'
+          + rec.files.map((f) =>
+              '<div style="color:#67717f;padding-left:12px;word-break:break-all">'
+              + (f.res ? '<span style="color:#93a0b0">' + esc(f.res) + '</span> ' : '')
+              + bytes(f.size) + ' · ' + esc(f.fileName)
+              + (f.exists ? '' : ' <span style="color:#e5533d">（文件已不在）</span>')
+              + '</div>').join('')
+          + '</div>').join('')
+      + (yearMismatch
+          ? '<div style="margin-top:8px;padding:7px 10px;border-radius:7px;background:#2a1b18;'
+            + 'color:#e5533d;font-size:11.5px;line-height:1.6">'
+            + '⚠ 这几条的本地年份不一样（' + yrs.join(' / ') + '）——多半是<b>错配</b>：'
+            + '不同的片子匹配到了同一部豆瓣电影，而不是同一部片的两个版本。<br>'
+            + '建议先用「修正错配」或手动绑定处理，别急着合并。</div>'
+          : '')
+      + '<div style="margin-top:9px"><button class="btn' + (g.merged ? ' ghost' : '') + '"'
+      + ' data-merge="' + esc(g.id) + '" data-on="' + (g.merged ? '0' : '1') + '">'
+      + (g.merged ? '↩ 取消合并（恢复成 ' + g.records.length + ' 条）' : '🔗 合并成一条')
+      + '</button></div>'
+      + '</div>';
+  }).join(''));
+}
+
+async function doMerge(id, on, btn) {
+  const label = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = on ? '合并中…' : '取消中…'; }
+  try {
+    const r = await fetch('/api/merge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, merge: on }),
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || '操作失败');
+    await load();          // 海报墙立刻反映合并结果
+    await findMerges();    // 重画这个列表（按钮状态跟着更新）
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+    alert((on ? '合并' : '取消合并') + '失败：' + e.message);
+  }
+}
+
+// ---------------------------------------------------------------- 重复文件
+async function findDuplicates() {
+  $('dupBox').innerHTML = '<p class="hint">正在查找…</p>';
+  $('doDelete').style.display = 'none';
+  try {
+    const r = await fetch('/api/duplicates');
+    const d = await r.json();
+    renderDup(d);
+  } catch (e) {
+    $('dupBox').innerHTML = '<p class="hint" style="color:#e5533d">查找失败：' + esc(e.message) + '</p>';
+  }
+}
+
+function renderDup(data) {
+  const groups = (data && data.groups) || [];
+  if (!groups.length) {
+    $('dupBox').innerHTML = '<p class="hint">✅ 没有发现重复文件。</p>';
+    $('doDelete').style.display = 'none';
+    return;
+  }
+  $('dupBox').innerHTML = groups.map((g) => {
+    return '<div style="background:var(--card);border-radius:9px;padding:10px 12px;margin-bottom:10px">'
+      + '<div style="font-weight:600;margin-bottom:4px">' + esc(g.title)
+      + ' <span style="color:#67717f;font-weight:400">· ' + g.files.length + ' 个文件</span></div>'
+      + g.files.map((f) =>
+        '<label style="display:flex;align-items:flex-start;gap:9px;padding:6px 0;cursor:pointer;'
+        + 'border-top:1px solid #232a34">'
+        + '<input type="checkbox" class="dupchk" value="' + esc(f.file) + '" data-size="' + (f.size || 0) + '" '
+        + 'style="margin-top:3px;width:15px;height:15px;accent-color:#e5533d">'
+        + '<span style="flex:1;min-width:0;font-size:12px">'
+        + '<b style="color:#e8ecf2">' + bytes(f.size) + '</b>'
+        + (f.res ? ' <span style="color:#93a0b0">' + esc(f.res) + '</span>' : '')
+        + (f.exists ? '' : ' <span style="color:#e5533d">（文件已不在）</span>')
+        + '<br><span style="color:#67717f;word-break:break-all">' + esc(f.file) + '</span>'
+        + '</span></label>').join('')
+      + '</div>';
+  }).join('');
+  $('doDelete').style.display = '';
+}
+
+async function doDeleteSelected() {
+  const boxes = [...document.querySelectorAll('.dupchk:checked')];
+  if (!boxes.length) { alert('请先勾选要清理的文件。'); return; }
+  const files = boxes.map((b) => b.value);
+  const totalBytes = boxes.reduce((s, b) => s + (parseInt(b.dataset.size, 10) || 0), 0);
+  if (!confirm('即将把选中的 ' + files.length + ' 个文件（共 ' + bytes(totalBytes) + '）\n'
+    + '移到各自硬盘上的 _movie-lib_deleted 文件夹。\n\n'
+    + '· 同盘移动，瞬间完成\n'
+    + '· 不是真删除，可随时拷回原位\n'
+    + '· 不需要了就把 _movie-lib_deleted 整个删掉\n\n确定继续吗？')) return;
+
+  $('doDelete').disabled = true;
+  $('doDelete').textContent = '正在移动…';
+  try {
+    const r = await fetch('/api/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files }),
+    });
+    const d = await r.json();
+    let msg = '✅ 已移出片库：' + (d.deleted || []).length + ' 个文件\n\n';
+    const targets = [...new Set((d.deleted || []).map((x) => String(x.movedTo || '').replace(/[\\/][^\\/]*$/, '')))];
+    if (targets.length) msg += '存放位置：\n' + targets.map((t) => '  ' + t).join('\n') + '\n\n';
+    if (d.failed && d.failed.length) {
+      msg += '⚠ 失败 ' + d.failed.length + ' 个：\n'
+        + d.failed.map((x) => '  ' + x.file.split(/[\\/]/).pop() + '（' + x.error + '）').join('\n') + '\n\n';
+    }
+    msg += '别忘了回到上面点一次「扫描」来刷新片库。';
+    alert(msg);
+    await findDuplicates();
+  } catch (e) {
+    alert('清理失败：' + e.message);
+  } finally {
+    $('doDelete').disabled = false;
+    $('doDelete').textContent = '🧹 清理选中（移到 _movie-lib_deleted）';
+  }
+}
+
+// ---------------------------------------------------------------- 抓取豆瓣资料
+function fmtDuration(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return s + ' 秒';
+  const m = Math.floor(s / 60);
+  return m + ' 分 ' + (s % 60) + ' 秒';
+}
+
+/**
+ * 一键流程 —— 「📥 抓取资料」按钮走这条：
+ *   ① 保存目录  →  ② 扫描（等它跑完）  →  ③ 抓取资料
+ *
+ * 顺序不能换：抓取读的是扫描产出的 data/scan-result.json。
+ * 这些提示都走 mgTxt/mgHTML，面板中途被关掉也不会把流程打断
+ * （抓取要跑几十分钟，用户肯定要关掉面板去看海报墙）。
+ */
+async function startAll() {
+  const dirs = readDirInputs();
+  if (!dirs) return;                                       // 面板已经关了
+  if (!dirs.length) { mgTxt('mgrMsg', '请先添加至少一个电影目录。'); return; }
+
+  const btnStart = $('startFetch'), btnStop = $('stopFetch');
+  const fail = (msg) => {
+    mgTxt('fetchBox', msg);
+    if (btnStart) btnStart.style.display = '';
+    if (btnStop) btnStop.style.display = 'none';
+  };
+  if (btnStart) btnStart.style.display = 'none';
+  if (btnStop) btnStop.style.display = 'none';
+
+  // ① 保存目录
+  mgTxt('fetchBox', '① 正在保存目录…');
+  try {
+    const r = await fetch('/api/config/dirs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ movieDirs: dirs }),
+    });
+    const d = await r.json();
+    if (!d.ok) return fail('保存目录失败：' + (d.error || '未知错误'));
+    let msg = '✅ 已保存 ' + d.movieDirs.length + ' 个目录。';
+    if (d.problems && d.problems.length) {
+      msg += ' 忽略了 ' + d.problems.length + ' 个不可用：'
+        + d.problems.map((x) => x.path + '（' + x.why + '）').join('、');
+    }
+    mgTxt('mgrMsg', msg);
+  } catch (e) { return fail('保存目录失败：' + e.message); }
+
+  // ② 扫描（必须等它跑完，抓取读的是它产出的 scan-result.json）
+  mgTxt('fetchBox', '② 正在启动扫描…');
+  try {
+    const r = await fetch('/api/scan', { method: 'POST' });
+    const d = await r.json();
+    if (!d.ok) return fail('扫描启动失败：' + (d.error || '未知错误'));
+  } catch (e) { return fail('扫描启动失败：' + e.message); }
+
+  for (;;) {
+    await sleep(700);
+    let st;
+    try { st = await (await fetch('/api/scan/status')).json(); }
+    catch { continue; }                                    // 网络抖一下就再等一轮
+    if (st.running) { mgTxt('fetchBox', '② 正在扫描… ' + (st.progress || '')); continue; }
+    if (st.error) return fail('扫描出错：' + st.error);
+    const sum = st.summary || {};
+    mgTxt('scanBox', '✅ 扫描完成：收录 ' + (sum.total || 0) + ' 部');
+    mgTxt('fetchBox', '② 扫描完成（' + (sum.total || 0) + ' 部），接着抓资料…');
+    await load();                                          // 让海报墙立刻出现片子
+    break;
+  }
+
+  // ③ 抓取资料
+  if (btnStart) btnStart.style.display = '';
+  doFetch(false, false);
+}
+
+async function doFetch(retryFailed, rematch) {
+  $('fetchBox').textContent = '正在启动抓取…';
+  try {
+    const r = await fetch('/api/fetch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ retryFailed: !!retryFailed, rematch: !!rematch }),
+    });
+    const d = await r.json();
+    if (!d.ok) { $('fetchBox').textContent = d.error || '启动失败'; return; }
+    pollFetch();
+  } catch (e) { $('fetchBox').textContent = '启动失败：' + e.message; }
+}
+
+async function pollFetch() {
+  try {
+    const r = await fetch('/api/fetch/status');
+    const d = await r.json();
+    const p = d.progress || {};
+    const pct = p.total ? Math.round((p.ok / p.total) * 100) : 0;
+
+    const btnStart = $('startFetch'), btnStop = $('stopFetch');
+    if (btnStart) btnStart.style.display = d.running ? 'none' : '';
+    if (btnStop) btnStop.style.display = d.running ? '' : 'none';
+
+    if (d.running) {
+      const spent = d.startedAt ? fmtDuration(Date.now() - d.startedAt) : '';
+      const tail = (d.tail || []).slice(-6).map((l) => esc(l)).join('<br>');
+      mgHTML('fetchBox', '⏳ 抓取中… ' + spent + '<br>'
+        + '<b>进度：' + p.ok + ' / ' + p.total + '</b>（' + pct + '%）'
+        + '　待确认 ' + (p.needsConfirm || 0) + '　未匹配 ' + (p.unmatched || 0)
+        + '<div style="margin-top:8px;max-height:120px;overflow:auto;font-family:monospace;font-size:11px;'
+        + 'color:#67717f;background:#141a20;padding:8px;border-radius:6px">' + (tail || '（等待输出…）') + '</div>');
+      setTimeout(pollFetch, 2000);
+      return;
+    }
+
+    // 结束了
+    if (d.error) { mgTxt('fetchBox', '抓取出错：' + d.error); return; }
+    if (d.finishedAt) {
+      const spent = d.startedAt ? fmtDuration(d.finishedAt - d.startedAt) : '';
+      mgHTML('fetchBox', '✅ 抓取结束（用时 ' + spent + '）：'
+        + '<b>' + p.ok + ' / ' + p.total + '</b> 部有资料'
+        + '　待确认 ' + (p.needsConfirm || 0) + '　未匹配 ' + (p.unmatched || 0)
+        + '<br><span style="color:#67717f">可以关掉本窗口看海报了；想继续补就再点一次「抓取资料」。</span>');
+      await load();
+      return;
+    }
+    mgTxt('fetchBox', '');
+  } catch (e) { mgTxt('fetchBox', '查询失败：' + e.message); }
+}
+
+async function pollScan() {
+  try {
+    const r = await fetch('/api/scan/status');
+    const d = await r.json();
+    if (d.running) {
+      mgTxt('scanBox', '扫描中… ' + (d.progress || ''));
+      setTimeout(pollScan, 1000);
+      return;
+    }
+    if (d.error) { mgTxt('scanBox', '扫描出错：' + d.error); return; }
+    const s = d.summary;
+    if (!s) { mgTxt('scanBox', ''); return; }
+    mgHTML('scanBox', '✅ 扫描完成（用时 ' + s.seconds + ' 秒）：收录 <b>' + s.total + '</b> 部'
+      + '，待确认 ' + s.abbr + '，排除剧集 ' + s.episodes + ' 个目录<br>'
+      + (s.dirs || []).map((x) => '· ' + esc(x.dir) + ' → ' + x.got + ' 部').join('<br>')
+      + '<br><span style="color:#67717f">片库已更新，关掉本窗口即可看到新列表。</span>');
+    await load();
+  } catch (e) { mgTxt('scanBox', '查询失败：' + e.message); }
+}
+
+// ---------------------------------------------------------------- 手动绑定
+function openBind(m) {
+  const kw = (m.cn || m.en || '').replace(/[\s·:：]/g, ' ').trim();
+  $('sheet').innerHTML =
+    '<button class="close" id="closeBtn">×</button>'
+    + '<div class="inner" style="grid-template-columns:1fr">'
+    +   '<div>'
+    +     '<h2 style="font-size:17px">手动匹配：' + esc(m.cn || m.en || m.dirName) + '</h2>'
+    +     '<p class="hint">原始目录名：' + esc(m.dirName) + '</p>'
+    +     (m.status === 'ok'
+            ? '<p class="hint" style="color:#ffb703">当前匹配：' + esc(m.title || '?')
+              + (m.year ? ' (' + m.year + ')' : '')
+              + ' · ' + (m.confidence === 'manual' ? '手动绑定' : '自动匹配')
+              + '<br>如果不对，在下面重新选一个绑上去就行。</p>'
+            : '<p class="hint">这个条目还没匹配到豆瓣电影。</p>')
+    +     '<div class="bindsearch">'
+    +       '<input id="bokw" value="' + esc(kw) + '" placeholder="输入片名后回车搜索">'
+    +       '<button class="btn" id="bogo">搜索</button>'
+    +     '</div>'
+    +     '<div id="cands" class="cands"></div>'
+    +     '<div id="bomsg" class="hint"></div>'
+    +   '</div>'
+    + '</div>';
+  $('closeBtn').onclick = closeSheet;
+
+  const go = async () => {
+    const q = $('bokw').value.trim();
+    if (!q) return;
+    $('bomsg').textContent = '搜索中…';
+    $('cands').innerHTML = '';
+    try {
+      const r = await fetch('/api/search?q=' + encodeURIComponent(q));
+      const d = await r.json();
+      const items = (d.items || []).filter((x) => x.id && x.title);
+      $('bomsg').textContent = items.length ? ('找到 ' + items.length + ' 个候选，点选正确的那个：') : '没有搜到结果，换个关键词试试';
+      $('cands').innerHTML = items.map((x) =>
+        '<button class="cand" data-id="' + esc(x.id) + '">'
+        + (x.img ? '<img loading="lazy" src="' + esc(x.img) + '" alt="">' : '<div class="ph">无图</div>')
+        + '<p>' + esc(x.title) + (x.year ? ' (' + x.year + ')' : '') + '</p></button>').join('');
+      $('cands').querySelectorAll('.cand').forEach((el) => {
+        el.onclick = () => doBind(m, el.dataset.id);
+      });
+    } catch (e) { $('bomsg').textContent = '搜索失败：' + e.message; }
+  };
+
+  $('bogo').onclick = go;
+  $('bokw').onkeydown = (e) => { if (e.key === 'Enter') go(); };
+  go();
+}
+
+async function doBind(m, id) {
+  $('bomsg').textContent = '正在抓取资料与海报…';
+  try {
+    const r = await fetch('/api/bind', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: m.key, doubanId: id }),
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || '绑定失败');
+    const i = S.all.findIndex((x) => x.key === m.key);
+    S.all[i] = d.movie;
+    buildFilterUI({ generatedAt: null });
+    render();
+    closeSheet();
+  } catch (e) { $('bomsg').textContent = '失败：' + e.message; }
+}
+
+// ---------------------------------------------------------------- 事件
+$('q').oninput = (e) => { S.q = e.target.value; render(); };
+$('rate').oninput = (e) => { S.rate = parseFloat(e.target.value); $('rateVal').textContent = S.rate; render(); };
+['y1','y2','d1','d2'].forEach((id) => { $(id).oninput = (e) => { S[id] = e.target.value ? parseInt(e.target.value,10) : null; render(); }; });
+$('manage').onclick = openManage;
+
+document.addEventListener('click', (e) => {
+  const sp = e.target.closest('[data-smartplay]');
+  if (sp) { e.stopPropagation(); playSmart(sp.dataset.smartplay); return; }
+  const ep = e.target.closest('[data-extplay]');
+  if (ep) { e.stopPropagation(); openExternal(ep.dataset.extplay); return; }
+  const cl = e.target.closest('[data-copylink]');
+  if (cl) { e.stopPropagation(); copyLink(cl.dataset.copylink, cl); return; }
+  const wp = e.target.closest('[data-webplay]');
+  if (wp) { e.stopPropagation(); openPlayer(wp.dataset.webplay, wp.dataset.title); return; }
+  const pb = e.target.closest('[data-play]');
+  if (pb) { e.stopPropagation(); playFile(pb.dataset.play, pb.classList.contains('btnplay') ? pb : null); return; }
+  const rv = e.target.closest('[data-reveal]');
+  if (rv) { e.stopPropagation(); revealFile(rv.dataset.reveal); return; }
+  const df = e.target.closest('[data-delfile]');
+  if (df) {
+    e.stopPropagation();
+    deleteFiles([df.dataset.delfile], '这个文件（' + bytes(parseInt(df.dataset.delsize, 10) || 0) + '）');
+    return;
+  }
+  const rb = e.target.closest('[data-rebind]');
+  if (rb) {
+    e.stopPropagation();
+    const mv = findMovie(rb.dataset.rebind);
+    if (mv) openBind(mv);
+    return;
+  }
+  const mg = e.target.closest('[data-merge]');
+  if (mg) { e.stopPropagation(); doMerge(mg.dataset.merge, mg.dataset.on === '1', mg); return; }
+  const chip = e.target.closest('.chip');
+  if (chip) {
+    if (chip.dataset.sort) { S.sort = chip.dataset.sort; document.querySelectorAll('#sortChips .chip').forEach((c) => c.classList.toggle('on', c === chip)); render(); return; }
+    const [setName, attr] = chip.dataset.genre ? ['genres','genre'] : chip.dataset.country ? ['countries','country'] : chip.dataset.status ? ['status','status'] : [];
+    if (setName) { const v = chip.dataset[attr]; S[setName].has(v) ? S[setName].delete(v) : S[setName].add(v); chip.classList.toggle('on'); render(); }
+    return;
+  }
+  const card = e.target.closest('.card');
+  if (card) { const m = findMovie(card.dataset.key); if (m) openSheet(m); }
+});
+$('mask').onclick = (e) => { if (e.target === $('mask')) closeSheet(); };
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if ($('player').classList.contains('on')) closePlayer();
+  else closeSheet();
+});
+$('reset').onclick = () => {
+  S.rate = 0; $('rate').value = 0; $('rateVal').textContent = '0';
+  S.genres.clear(); S.countries.clear(); S.status.clear();
+  S.y1 = S.y2 = S.d1 = S.d2 = null; ['y1','y2','d1','d2'].forEach((id) => $(id).value = '');
+  S.q = ''; $('q').value = '';
+  document.querySelectorAll('.chip.on').forEach((c) => { if (!c.dataset.sort) c.classList.remove('on'); });
+  render();
+};
+
+load();
+</script>
+</body>
+</html>
