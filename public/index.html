@@ -804,39 +804,84 @@ async function openManage() {
     del.className = 'btnmini';
     del.style.cssText = 'padding:8px 12px;flex:0 0 auto';
     del.textContent = '删除';
-    del.onclick = () => row.remove();
+    del.onclick = () => { row.remove(); picker.remove(); };
 
-    // 「浏览…」：让服务端（也就是这台电脑）弹一个 Windows 文件夹选择框
+    // 「浏览…」：打开一个网页自带的目录浏览器 —— 不依赖系统弹窗
+    // （有些机器上 FolderBrowserDialog 根本弹不出来，所以自己做一个）
     const browse = document.createElement('button');
     browse.className = 'btnmini';
     browse.style.cssText = 'padding:8px 12px;flex:0 0 auto';
     browse.textContent = '浏览…';
-    browse.title = '在电脑上弹出文件夹选择框（手机上加目录请手动填路径）';
+    browse.title = '在里面点进点出，选一个电影目录';
     if (IS_MOBILE) browse.style.display = 'none';
-    browse.onclick = async () => {
-      const label = browse.textContent;
-      browse.disabled = true;
-      browse.textContent = '…';
-      mgTxt('mgrMsg', '已弹出文件夹选择框，到电脑上选一个目录…');
+
+    const picker = document.createElement('div');
+    picker.style.cssText = 'display:none;margin:0 0 10px;padding:10px 12px;'
+      + 'background:var(--card);border-radius:9px;font-size:12.5px';
+
+    const renderPicker = (d) => {
+      if (!d || !d.ok) {
+        picker.innerHTML = '<div style="color:#e5533d">读不了这个目录：'
+          + esc((d && d.error) || '未知错误') + '</div>'
+          + '<div style="margin-top:9px"><button class="btnmini" data-pk="close">关闭</button></div>';
+        return;
+      }
+      const dirs = d.dirs || [];
+      picker.innerHTML =
+        '<div style="color:#93a0b0;margin-bottom:8px">当前位置：'
+        + '<b style="color:#e8ecf2">' + esc(d.path || '请选择磁盘') + '</b></div>'
+        + (dirs.length
+            ? '<div style="display:flex;flex-wrap:wrap;gap:6px;max-height:200px;overflow:auto">'
+              + dirs.map((x) => '<button class="btnmini" data-pk="go" data-path="' + esc(x.path) + '"'
+                  + ' style="max-width:100%;text-align:left;word-break:break-all">📁 ' + esc(x.name)
+                  + '</button>').join('')
+              + '</div>'
+            : '<div style="color:#5c6673">（这个目录下没有子文件夹）</div>')
+        + '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
+        +   (d.parent ? '<button class="btnmini" data-pk="go" data-path="' + esc(d.parent) + '">↑ 上一级</button>' : '')
+        +   (d.path ? '<button class="btnmini" data-pk="pick" data-path="' + esc(d.path) + '"'
+              + ' style="border-color:var(--accent);color:var(--accent)">✓ 就选这个目录</button>' : '')
+        +   '<button class="btnmini" data-pk="close">关闭</button>'
+        + '</div>';
+    };
+
+    const loadDir = async (dir) => {
+      picker.innerHTML = '<div style="color:#67717f">读取中…</div>';
       try {
-        const r = await fetch('/api/pick-dir', { method: 'POST' });
-        const d = await r.json();
-        if (d.ok && d.path) {
-          inp.value = d.path;
-          mgTxt('mgrMsg', d.exists ? ('已选：' + d.path) : ('已选：' + d.path + '（但这个路径用不了：' + (d.why || '') + '）'));
-        } else if (!d.cancelled) {
-          mgTxt('mgrMsg', d.error || '没选到目录');
-        } else {
-          mgTxt('mgrMsg', '');
-        }
-      } catch (e) { mgTxt('mgrMsg', '打开选择框失败：' + e.message); }
-      finally { browse.disabled = false; browse.textContent = label; }
+        const r = await fetch('/api/ls?path=' + encodeURIComponent(dir || ''));
+        renderPicker(await r.json());
+      } catch (e) {
+        picker.innerHTML = '<div style="color:#e5533d">读取失败：' + esc(e.message) + '</div>';
+      }
+    };
+
+    picker.onclick = async (ev) => {
+      const b = ev.target.closest('[data-pk]');
+      if (!b) return;
+      const act = b.dataset.pk;
+      if (act === 'close') { picker.style.display = 'none'; return; }
+      if (act === 'go') { await loadDir(b.dataset.path); return; }
+      if (act === 'pick') {
+        inp.value = b.dataset.path;
+        mgTxt('mgrMsg', '已选：' + b.dataset.path + '（记得再点「📥 抓取资料」保存并扫描）');
+        picker.style.display = 'none';
+      }
+    };
+
+    browse.onclick = () => {
+      if (picker.style.display === 'none') {
+        picker.style.display = '';
+        loadDir('');                       // 先列出所有磁盘
+      } else {
+        picker.style.display = 'none';
+      }
     };
 
     row.appendChild(inp);
     row.appendChild(browse);
     row.appendChild(del);
     list.appendChild(row);
+    list.appendChild(picker);              // 浏览器就挂在这一行下面
   };
 
   try {

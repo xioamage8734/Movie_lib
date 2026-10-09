@@ -495,6 +495,45 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, { movieDirs: CONFIG.movieDirs || [], dirs, port: PORT });
     }
 
+    // 列目录（给网页里的目录浏览器用）。不依赖任何系统弹窗 ——
+    // 有些机器上 FolderBrowserDialog 弹不出来，所以自带一个。
+    if (p === '/api/ls' && req.method === 'GET') {
+      const dirQ = u.searchParams.get('path') || '';
+      if (!dirQ) {
+        // 没给路径 → 列出所有磁盘
+        const drives = [];
+        for (let c = 65; c <= 90; c++) {
+          const d = String.fromCharCode(c) + ':/';
+          try { if (fs.statSync(d).isDirectory()) drives.push({ name: d, path: d }); } catch { /* 没这个盘 */ }
+        }
+        return sendJson(res, { ok: true, path: '', parent: null, dirs: drives });
+      }
+      const abs = path.resolve(dirQ);
+      let entries;
+      try { entries = fs.readdirSync(abs, { withFileTypes: true }); }
+      catch (e) { return sendJson(res, { ok: false, error: String((e && e.message) || e) }, 400); }
+
+      const dirs = [];
+      const base = abs.replace(/\\/g, '/');
+      for (const it of entries) {
+        if (!it.isDirectory()) continue;
+        if (it.name.startsWith('.')) continue;                       // 隐藏目录
+        if (it.name === '$RECYCLE.BIN') continue;
+        if (it.name === 'System Volume Information') continue;
+        // 注意别拼出 "F://xxx" —— 盘根（"F:/"）本身就带尾部斜杠
+        dirs.push({ name: it.name, path: base + (base.endsWith('/') ? '' : '/') + it.name });
+      }
+      dirs.sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+
+      const up = path.dirname(abs);
+      return sendJson(res, {
+        ok: true,
+        path: abs.replace(/\\/g, '/'),
+        parent: up === abs ? null : up.replace(/\\/g, '/'),
+        dirs,
+      });
+    }
+
     // 弹一个 Windows 文件夹选择框（只能在跑服务的那台电脑上弹；手机上加目录请手动填路径）
     if (p === '/api/pick-dir' && req.method === 'POST') {
       const script = [
