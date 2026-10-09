@@ -212,9 +212,20 @@ function nameQuality(cn, en) {
   return cjk >= 2 ? 'good' : 'short';
 }
 
-/** 用于判断“同一部片的不同版本”的归一化 key */
-function normalizeKey(cn, en, year) {
+/**
+ * 用于判断「同一部片的不同版本」的归一化 key。
+ *
+ * ★ 有个坑必须避开：片名**彻底解析不出来**时（目录名全是一堆广告词或符号），
+ *   base 会是空字符串，于是 key 变成 "|" —— 两部毫不相干的片子只要都解析不出名字、
+ *   年份又恰好相同，就会被并成同一条，而用户还没法分别手动匹配。
+ *   所以这种情况下改用 extra（目录 + 文件名）当依据：每个文件各算一条。
+ *   宁可多出几条让用户自己合并，也绝不能把不同的片子混在一起。
+ */
+function normalizeKey(cn, en, year, extra) {
   const base = (cn && cn.length ? cn : en).toLowerCase().replace(/[\s.·:：\-_]/g, '');
+  if (!base) {
+    return '?' + String(extra || '').toLowerCase().replace(/\\/g, '/') + '|' + (year || '');
+  }
   return base + '|' + (year || '');
 }
 

@@ -82,7 +82,7 @@ function buildRec(sourceDir, dirName, filePath) {
     sourceDir, dirName, file: filePath, fileName: fn, size,
     cn, en, year, res,
     quality: C.nameQuality(cn, en),
-    key: C.normalizeKey(cn, en, year),
+    key: C.normalizeKey(cn, en, year, dirName + '/' + fn),
   };
 }
 

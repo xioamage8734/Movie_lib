@@ -723,8 +723,10 @@ async function openManage() {
     + '<div class="inner" style="grid-template-columns:1fr">'
     +   '<div>'
     +     '<h2 style="font-size:18px">电影目录</h2>'
-    +     '<p class="hint">每行一个目录（你的电影库根目录）。加好之后，直接点下面的「📥 抓取资料」——'
-    +       '它会自动帮你保存目录、扫描，然后再抓海报和评分。</p>'
+    +     '<p class="hint">每行一个目录（你的电影库根目录）。'
+    +       '路径里用 \\ 或 / 都行 —— 直接从资源管理器的地址栏复制粘贴就可以；'
+    +       '拿不准就点「浏览…」在电脑上选一个。<br>'
+    +       '加好之后，直接点下面的「📥 抓取资料」——它会自动帮你保存目录、扫描，然后抓海报和评分。</p>'
     +     '<div id="dirList"></div>'
     +     '<button class="rowbtn" id="addDir" style="margin-top:6px">＋ 添加一个目录</button>'
     +     '<div style="margin-top:14px">'
@@ -789,7 +791,36 @@ async function openManage() {
     del.style.cssText = 'padding:8px 12px;flex:0 0 auto';
     del.textContent = '删除';
     del.onclick = () => row.remove();
+
+    // 「浏览…」：让服务端（也就是这台电脑）弹一个 Windows 文件夹选择框
+    const browse = document.createElement('button');
+    browse.className = 'btnmini';
+    browse.style.cssText = 'padding:8px 12px;flex:0 0 auto';
+    browse.textContent = '浏览…';
+    browse.title = '在电脑上弹出文件夹选择框（手机上加目录请手动填路径）';
+    if (IS_MOBILE) browse.style.display = 'none';
+    browse.onclick = async () => {
+      const label = browse.textContent;
+      browse.disabled = true;
+      browse.textContent = '…';
+      mgTxt('mgrMsg', '已弹出文件夹选择框，到电脑上选一个目录…');
+      try {
+        const r = await fetch('/api/pick-dir', { method: 'POST' });
+        const d = await r.json();
+        if (d.ok && d.path) {
+          inp.value = d.path;
+          mgTxt('mgrMsg', d.exists ? ('已选：' + d.path) : ('已选：' + d.path + '（但这个路径用不了：' + (d.why || '') + '）'));
+        } else if (!d.cancelled) {
+          mgTxt('mgrMsg', d.error || '没选到目录');
+        } else {
+          mgTxt('mgrMsg', '');
+        }
+      } catch (e) { mgTxt('mgrMsg', '打开选择框失败：' + e.message); }
+      finally { browse.disabled = false; browse.textContent = label; }
+    };
+
     row.appendChild(inp);
+    row.appendChild(browse);
     row.appendChild(del);
     list.appendChild(row);
   };

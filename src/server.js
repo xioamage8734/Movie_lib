@@ -495,6 +495,30 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, { movieDirs: CONFIG.movieDirs || [], dirs, port: PORT });
     }
 
+    // 弹一个 Windows 文件夹选择框（只能在跑服务的那台电脑上弹；手机上加目录请手动填路径）
+    if (p === '/api/pick-dir' && req.method === 'POST') {
+      const script = [
+        '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8',
+        'Add-Type -AssemblyName System.Windows.Forms',
+        '$f = New-Object System.Windows.Forms.FolderBrowserDialog',
+        "$f.Description = '选择你的电影目录（里面一部电影一个文件夹，或者直接放视频文件）'",
+        '$f.ShowNewFolderButton = $false',
+        'if ($f.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { exit 1 }',
+        '[Console]::Out.Write($f.SelectedPath)',
+      ].join('; ');
+
+      return execFile('powershell',
+        ['-NoProfile', '-STA', '-Command', script],
+        { timeout: 300000, windowsHide: true },
+        (err, stdout) => {
+          if (err) return sendJson(res, { ok: false, cancelled: true, error: '没有选择目录' });
+          const dir = String(stdout || '').trim().replace(/\\/g, '/').replace(/\/+$/, '');
+          if (!dir) return sendJson(res, { ok: false, cancelled: true, error: '没有拿到路径' });
+          const c = checkDir(dir);
+          return sendJson(res, { ok: true, path: dir, exists: c.exists, why: c.why });
+        });
+    }
+
     if (p === '/api/config/dirs' && req.method === 'POST') {
       let payload = {};
       try { payload = JSON.parse((await readBody(req)) || '{}'); } catch { /* ignore */ }
