@@ -204,6 +204,9 @@
   html.is-mobile #playerOpenLocal{display:none}
   html.is-mobile .player .bar{gap:8px;padding:8px 10px}
   html.is-mobile .player .bar button{padding:6px 10px;font-size:12px;white-space:nowrap}
+  /* 手机端纯看片：不进管理面板（配目录、扫描、抓取、删除这些都在电脑上做） */
+  html.is-mobile #manage{display:none}
+  html.is-mobile #reset{margin-top:0}
 
   /* ---------- 绑定搜索 ---------- */
   .bindsearch{display:flex;gap:8px;margin-bottom:12px}
@@ -403,6 +406,14 @@ function render() {
     $('stat').innerHTML = '暂无影片';
     $('grid').innerHTML = '';
     $('empty').style.display = 'block';
+    if (IS_MOBILE) {
+      // 手机端不做配置：直接把人引导到电脑那边，免得误入一堆没法操作的设置项
+      $('empty').innerHTML = '<b>片库还是空的</b>'
+        + '请先用<b>这台电脑</b>上的浏览器打开 '
+        + '<span style="color:#c8d0da">http://localhost:7777</span><br>'
+        + '完成配置（添加电影目录 → 抓取资料），配好之后手机这边就能看了。';
+      return;
+    }
     $('empty').innerHTML = '<b>片库还是空的</b>'
       + '先点左下角「⚙ 管理电影目录」添加你的电影目录，再点「开始扫描」<br>'
       + '<button class="btn" id="emptyManage" style="margin-top:14px">⚙ 添加电影目录</button>';
@@ -465,21 +476,24 @@ function openSheet(m) {
             + '<span class="fname"><b>' + bytes(v.size) + '</b> · ' + esc(v.fileName) + '</span>'
             + '<button class="btnplay" data-smartplay="' + esc(v.file) + '" title="播放">▶ 播放</button>'
             + '<button class="btncopy" data-copylink="' + esc(v.file) + '" title="复制播放链接">复制链接</button>'
-            + ((m.versions || []).length > 1
+            + ((m.versions || []).length > 1 && !IS_MOBILE
                 ? '<button class="btndel" data-delfile="' + esc(v.file) + '" data-delsize="' + (v.size || 0)
                   + '" title="只删掉这一个版本（移到回收区）">🗑</button>'
                 : '')
             + '</div>'
           ).join('') + '<div style="margin-top:8px;color:#4a5261">' + esc(m.dirName) + '</div></div>'
-    +     ((m.versions && m.versions.length)
+    +     ((m.versions && m.versions.length && !IS_MOBILE)
             ? '<div style="margin-top:16px"><button class="btndelmovie" id="delMovie">🗑 删除这部电影'
               + (m.versions.length > 1 ? '（全部 ' + m.versions.length + ' 个文件）' : '')
               + '</button></div>'
             : '')
-    +     (todo ? '<div style="margin-top:10px"><button class="btn" data-bind="' + esc(m.key) + '">手动搜索豆瓣条目</button></div>' : '')
-    +     (todo ? ''
-            : '<div style="margin-top:10px"><button class="btn ghost" data-bind="' + esc(m.key)
-              + '">重新匹配豆瓣条目</button></div>')
+    +     (todo && !IS_MOBILE
+            ? '<div style="margin-top:10px"><button class="btn" data-bind="' + esc(m.key) + '">手动搜索豆瓣条目</button></div>'
+            : '')
+    +     (!todo && !IS_MOBILE
+            ? '<div style="margin-top:10px"><button class="btn ghost" data-bind="' + esc(m.key)
+              + '">重新匹配豆瓣条目</button></div>'
+            : '')
     +   '</div>'
     + '</div>';
   $('mask').classList.add('on');
