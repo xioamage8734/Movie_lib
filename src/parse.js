@@ -132,7 +132,7 @@ function parseMovieName(rawName) {
   s = s.replace(/(地址发布页|收藏不迷路|最新电影|更多高清)[\s\S]*$/, ' ');
   s = s.replace(/[.\u00b7\s]*(https?:\/\/|\bwww\.)[\s\S]*$/i, ' ');
 
-  // 4) 常见“片尾组名”： -MiniHD / ￡CMCT牛仔 / @BBQDDQ.COM / 6.94GB
+  // 4) 常见“片尾组名”： -MiniHD / ￡压制组名 / @站点域名.COM / 6.94GB
   s = s.replace(/[\s]*[￡@][^\s]*/g, ' ');
   s = s.replace(/\s*\d+(?:\.\d+)?\s*(?:GB|MB|GiB)\s*$/i, ' ');
 
