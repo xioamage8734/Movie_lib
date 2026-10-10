@@ -364,10 +364,17 @@ const IS_TV = /SmartTV|SMART-TV|Tizen|WebOS|NetCast|BRAVIA|HbbTV|AppleTV|Roku|Cr
 // 手机、平板、电视都算在内，因为它们的播放方式相同：唤起这台设备上的播放器。
 const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile|HarmonyOS/i.test(UA) || IS_TV;
 
-// 「点 ▶ 时用哪台设备播放」：默认按上面的判断猜，用户可以自己改，选择记在浏览器本地。
+/**
+ * 还有一个比 UA 可靠得多的信号：**别的设备只能通过局域网 IP 访问**，
+ * 不可能用 localhost / 127.0.0.1 打开你这台电脑。
+ * 所以访问地址不是本机地址的，一定是「别的设备」。
+ */
+const IS_LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(location.hostname);
+
+// 「点 ▶ 时用哪台设备播放」：默认靠上面两个信号判断，用户可以自己改，选择记在浏览器本地。
 // 为什么要这个开关：UA 永远猜不全（电视、盒子、浏览器开「桌面模式」都会认错），
 // 认错时用户点一下就能纠正，而不是来改代码。
-let PLAY_MODE = IS_MOBILE ? 'here' : 'local';
+let PLAY_MODE = (IS_MOBILE || !IS_LOCAL_HOST) ? 'here' : 'local';
 try {
   const saved = localStorage.getItem('mvPlayMode');
   if (saved === 'local' || saved === 'here') PLAY_MODE = saved;
@@ -382,7 +389,8 @@ try {
  *   「用这台设备播放」，就按非电脑处理。
  */
 function applyDeviceClass() {
-  document.documentElement.classList.toggle('is-mobile', !!(IS_MOBILE || PLAY_MODE === 'here'));
+  document.documentElement.classList.toggle('is-mobile',
+    !!(IS_MOBILE || !IS_LOCAL_HOST || PLAY_MODE === 'here'));
 }
 applyDeviceClass();
 const bytes = (b) => { const u=['B','KB','MB','GB','TB']; let i=0,n=b||0; while(n>=1024&&i<u.length-1){n/=1024;i++;} return (i<2?n.toFixed(0):n.toFixed(2))+' '+u[i]; };
