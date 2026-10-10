@@ -283,6 +283,15 @@
     </div>
     <button class="rowbtn" id="reset">清空全部筛选</button>
     <button class="rowbtn" id="manage" style="margin-top:10px">⚙ 管理电影目录 / 重新扫描</button>
+
+<div class="fgroup" style="margin-top:18px">
+  <h3>点 ▶ 时</h3>
+  <div class="chips" id="modeChips">
+    <span class="chip" data-mode="local">用电脑播放</span>
+    <span class="chip" data-mode="here">用这台设备播放</span>
+  </div>
+  <p class="hint" style="font-size:11px;margin-top:6px">猜错了就点一下换过来，会记住。</p>
+</div>
   </aside>
 
   <main>
@@ -329,10 +338,24 @@ function readDirInputs() {
   return [...list.querySelectorAll('.dirinput')].map((i) => i.value.trim()).filter(Boolean);
 }
 
-// 手机 / 平板判定：playSmart 的走向和「外部播放器」按钮的显隐都靠它
 const UA = navigator.userAgent || '';
-const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile|HarmonyOS/i.test(UA);
+
+// 电视 / 机顶盒 / 游戏机的 UA 五花八门，单靠关键词经常认不出来 ——
+const IS_TV = /SmartTV|SMART-TV|Tizen|WebOS|NetCast|BRAVIA|HbbTV|AppleTV|Roku|CrKey|Xbox|PlayStation|Android TV|DTV|VIDAA|MiTV|Hisense|TV Safari/i.test(UA);
+
+// 注意：这个「mobile」的实际含义是「不是跑服务的那台电脑」——
+// 手机、平板、电视都算在内，因为它们的播放方式相同：唤起这台设备上的播放器。
+const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile|HarmonyOS/i.test(UA) || IS_TV;
 if (IS_MOBILE) document.documentElement.classList.add('is-mobile');
+
+// 「点 ▶ 时用哪台设备播放」：默认按上面的判断猜，用户可以自己改，选择记在浏览器本地。
+// 为什么要这个开关：UA 永远猜不全（电视、盒子、浏览器开「桌面模式」都会认错），
+// 认错时用户点一下就能纠正，而不是来改代码。
+let PLAY_MODE = IS_MOBILE ? 'here' : 'local';
+try {
+  const saved = localStorage.getItem('mvPlayMode');
+  if (saved === 'local' || saved === 'here') PLAY_MODE = saved;
+} catch { /* 隐私模式下 localStorage 用不了，就用默认值 */ }
 const bytes = (b) => { const u=['B','KB','MB','GB','TB']; let i=0,n=b||0; while(n>=1024&&i<u.length-1){n/=1024;i++;} return (i<2?n.toFixed(0):n.toFixed(2))+' '+u[i]; };
 const minutes = (m) => { for (const d of (m.durations||[])) { const x=String(d).match(/(\d+)/); if(x) return parseInt(x[1],10);} return null; };
 
@@ -694,8 +717,15 @@ function openExternal(file, manual) {
  */
 function playSmart(file) {
   if (!file) return;
-  if (IS_MOBILE) openExternal(file);
-  else playFile(file, null);
+  if (PLAY_MODE === 'here') openExternal(file);   // 唤起这台设备上的播放器（手机 / 电视）
+  else playFile(file, null);                      // 让跑服务的那台电脑打开播放器
+}
+
+/** 侧栏那组「用电脑播放 / 用这台设备播放」的高亮状态 */
+function renderModeChips() {
+  document.querySelectorAll('#modeChips .chip').forEach((c) => {
+    c.classList.toggle('on', c.dataset.mode === PLAY_MODE);
+  });
 }
 
 /** 复制播放链接（给手动在播放器里粘贴的用户） */
@@ -1452,6 +1482,14 @@ document.addEventListener('click', (e) => {
   }
   const mg = e.target.closest('[data-merge]');
   if (mg) { e.stopPropagation(); doMerge(mg.dataset.merge, mg.dataset.on === '1', mg); return; }
+  const mc = e.target.closest('#modeChips .chip');
+  if (mc) {
+    e.stopPropagation();
+    PLAY_MODE = mc.dataset.mode;
+    try { localStorage.setItem('mvPlayMode', PLAY_MODE); } catch { /* ignore */ }
+    renderModeChips();
+    return;
+  }
   const chip = e.target.closest('.chip');
   if (chip) {
     if (chip.dataset.sort) { S.sort = chip.dataset.sort; document.querySelectorAll('#sortChips .chip').forEach((c) => c.classList.toggle('on', c === chip)); render(); return; }
@@ -1478,6 +1516,7 @@ $('reset').onclick = () => {
 };
 
 load();
+renderModeChips();     // 高亮侧栏「点 ▶ 时」那组的当前选择
 </script>
 </body>
 </html>
