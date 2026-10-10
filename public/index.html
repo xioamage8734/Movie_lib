@@ -204,14 +204,16 @@
     background:transparent;color:var(--dim);font-size:13px}
   .player .bar button:hover{color:var(--fg);border-color:var(--dim2)}
   /* 视频占满「顶栏下方」的全部空间。
-     ★ 注意：<video> 是「替换元素」，光给 top/bottom 不会自动拉伸（会保持固有高度 150px），
-       必须用 calc 明确给 height —— 之前视频被挤成一条就是这个原因。 */
-  .player video{position:absolute;top:46px;left:0;right:0;
-    height:calc(100% - 46px);width:100%;background:#000;outline:none}
-  /* 提示行浮在视频上方（放在底部会挡住播放控件）。
-     这里用不透明底色 + 小字号，只有一行，不占视频高度。 */
-  .player .tip{position:absolute;left:0;right:0;top:46px;padding:7px 14px;font-size:12px;
-    color:#8b96a5;background:rgba(17,21,26,.9);text-align:center;pointer-events:none}
+     ★ 特意用一层普通 div 包住 <video>：div 能靠 top/bottom 正常拉伸，
+       而 <video> 是「替换元素」，直接给它 top/bottom 不会拉伸（会保持固有高度 150px），
+       calc() 在电视那种老浏览器上又未必认 —— 套一层是最稳的写法。 */
+  .player .vwrap{position:absolute;top:46px;left:0;right:0;bottom:0}
+  .player .vwrap video{display:block;width:100%;height:100%;background:#000;outline:none}
+  /* 提示行：平时藏起来（免得白占地方、挡画面），只有出错时才露出来 */
+  .player .tip{display:none;position:absolute;left:0;right:0;top:46px;padding:7px 14px;
+    font-size:12px;color:#8b96a5;background:rgba(17,21,26,.92);
+    text-align:center;pointer-events:none}
+  .player .tip.on{display:block}
   /* 播放层的「外部播放器」/「本机播放器」按设备二选一：
      电脑上「外部播放器」没意义，手机上的「本机播放器」会遥控电脑弹播放器，都不要显示 */
   #playerOpenExt{display:none}
@@ -325,8 +327,8 @@
     <button id="playerCopyLink" title="复制播放链接（可粘进手机播放器打开）">复制链接</button>
     <button id="playerClose">关闭 ✕</button>
   </div>
-  <video id="playerVideo" controls autoplay playsinline></video>
-  <div class="tip" id="playerTip">若画面出不来，说明浏览器不支持该格式（常见于 .mkv / H.265）——请改用「本机播放器」，或用手机上的 VLC 打开</div>
+  <div class="vwrap"><video id="playerVideo" controls autoplay playsinline></video></div>
+  <div class="tip" id="playerTip">若画面出不来，说明浏览器不支持该格式（常见于 .mkv / H.265）——请改用「外部播放器」打开。</div>
 </div>
 
 <script>
@@ -361,7 +363,6 @@ const IS_TV = /SmartTV|SMART-TV|Tizen|WebOS|NetCast|BRAVIA|HbbTV|AppleTV|Roku|Cr
 // 注意：这个「mobile」的实际含义是「不是跑服务的那台电脑」——
 // 手机、平板、电视都算在内，因为它们的播放方式相同：唤起这台设备上的播放器。
 const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile|HarmonyOS/i.test(UA) || IS_TV;
-if (IS_MOBILE) document.documentElement.classList.add('is-mobile');
 
 // 「点 ▶ 时用哪台设备播放」：默认按上面的判断猜，用户可以自己改，选择记在浏览器本地。
 // 为什么要这个开关：UA 永远猜不全（电视、盒子、浏览器开「桌面模式」都会认错），
@@ -371,6 +372,19 @@ try {
   const saved = localStorage.getItem('mvPlayMode');
   if (saved === 'local' || saved === 'here') PLAY_MODE = saved;
 } catch { /* 隐私模式下 localStorage 用不了，就用默认值 */ }
+
+/**
+ * 给页面打上「这不是跑服务的那台电脑」的标记 —— 决定要不要隐藏
+ * 「本机播放器」按钮、管理入口这些只对电脑有意义的东西。
+ *
+ * ★ 不能只看 UA：电视浏览器的 UA 五花八门，经常猜不出来（猜错的表现就是
+ *   电视上冒出「本机播放器」，一点结果电脑开始放）。所以只要用户手动选了
+ *   「用这台设备播放」，就按非电脑处理。
+ */
+function applyDeviceClass() {
+  document.documentElement.classList.toggle('is-mobile', !!(IS_MOBILE || PLAY_MODE === 'here'));
+}
+applyDeviceClass();
 const bytes = (b) => { const u=['B','KB','MB','GB','TB']; let i=0,n=b||0; while(n>=1024&&i<u.length-1){n/=1024;i++;} return (i<2?n.toFixed(0):n.toFixed(2))+' '+u[i]; };
 const minutes = (m) => { for (const d of (m.durations||[])) { const x=String(d).match(/(\d+)/); if(x) return parseInt(x[1],10);} return null; };
 
@@ -595,6 +609,7 @@ function openPlayer(file, title) {
   playerFile = file;
   $('playerName').textContent = title || file.split(/[\\/]/).pop();
   const tip = $('playerTip');
+  tip.classList.remove('on');            // 平时不显示提示行，免得白占地方
   tip.style.color = '';                  // 清掉上一次失败提示留下的红色
   tip.textContent = defaultTip();
   $('playerVideo').src = '/api/stream?file=' + encodeURIComponent(file);
@@ -616,6 +631,7 @@ $('playerOpenExt').onclick = () => { if (playerFile) openExternal(playerFile, tr
 $('playerCopyLink').onclick = () => { if (playerFile) copyLink(playerFile, $('playerCopyLink')); };
 $('playerVideo').onerror = () => {
   const tip = $('playerTip');
+  tip.classList.add('on');
   tip.style.color = '#e5533d';
   tip.textContent = IS_MOBILE
     ? '浏览器放不了这个格式（多半是 .mkv 或 H.265）。点上方「外部播放器」调这台设备上的播放器打开。'
@@ -643,6 +659,7 @@ function onExternalFail(file, manual) {
 function setFailTip(manual, file) {
   const tip = $('playerTip');
   tip.textContent = '';
+  tip.classList.add('on');               // 出错才把提示行亮出来
   tip.style.color = '#e5533d';
   tip.appendChild(document.createTextNode(
     (manual ? '还是没唤起。' : '没唤起这台设备上的播放器。')
@@ -1535,6 +1552,7 @@ document.addEventListener('click', (e) => {
     PLAY_MODE = mc.dataset.mode;
     try { localStorage.setItem('mvPlayMode', PLAY_MODE); } catch { /* ignore */ }
     renderModeChips();
+    applyDeviceClass();      // 改选「用这台设备播放」后，「本机播放器」之类的就该藏起来
     return;
   }
   const chip = e.target.closest('.chip');
