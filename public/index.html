@@ -191,25 +191,33 @@
   .close:hover{color:var(--fg)}
 
   /* ---------- 网页播放层 ---------- */
-  .player{position:fixed;top:0;right:0;bottom:0;left:0;background:#000;z-index:80;display:none;
-    flex-direction:column}
-  .player.on{display:flex}
-  .player .bar{display:flex;align-items:center;gap:12px;padding:10px 14px;
-    background:#11151a;border-bottom:1px solid var(--line);flex:0 0 auto}
+  /* 全部用绝对定位 + 明确高度，不依赖 flex ——
+     电视浏览器对 flex:1 支持不好，视频会被挤成很矮的一条。 */
+  .player{position:fixed;top:0;right:0;bottom:0;left:0;background:#000;z-index:80;display:none}
+  .player.on{display:block}
+  .player .bar{position:absolute;top:0;left:0;right:0;height:46px;box-sizing:border-box;
+    display:flex;align-items:center;gap:12px;padding:0 14px;
+    background:#11151a;border-bottom:1px solid var(--line)}
   .player .bar .nm{flex:1;font-size:13.5px;color:#dfe5ec;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .player .bar button{padding:6px 14px;border-radius:8px;border:1px solid var(--line);
     background:transparent;color:var(--dim);font-size:13px}
   .player .bar button:hover{color:var(--fg);border-color:var(--dim2)}
-  .player video{flex:1;width:100%;min-height:0;background:#000;outline:none}
-  .player .tip{padding:8px 14px;font-size:12px;color:#67717f;background:#11151a;
-    text-align:center}
+  /* 视频占满「顶栏下方」的全部空间。
+     ★ 注意：<video> 是「替换元素」，光给 top/bottom 不会自动拉伸（会保持固有高度 150px），
+       必须用 calc 明确给 height —— 之前视频被挤成一条就是这个原因。 */
+  .player video{position:absolute;top:46px;left:0;right:0;
+    height:calc(100% - 46px);width:100%;background:#000;outline:none}
+  /* 提示行浮在视频上方（放在底部会挡住播放控件）。
+     这里用不透明底色 + 小字号，只有一行，不占视频高度。 */
+  .player .tip{position:absolute;left:0;right:0;top:46px;padding:7px 14px;font-size:12px;
+    color:#8b96a5;background:rgba(17,21,26,.9);text-align:center;pointer-events:none}
   /* 播放层的「外部播放器」/「本机播放器」按设备二选一：
      电脑上「外部播放器」没意义，手机上的「本机播放器」会遥控电脑弹播放器，都不要显示 */
   #playerOpenExt{display:none}
   html.is-mobile #playerOpenExt{display:inline-block}
   html.is-mobile #playerOpenLocal{display:none}
-  html.is-mobile .player .bar{gap:8px;padding:8px 10px}
+  html.is-mobile .player .bar{gap:8px;padding:0 10px}
   html.is-mobile .player .bar button{padding:6px 10px;font-size:12px;white-space:nowrap}
   /* 手机端纯看片：不进管理面板（配目录、扫描、抓取、删除这些都在电脑上做） */
   html.is-mobile #manage{display:none}
