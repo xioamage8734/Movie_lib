@@ -157,7 +157,9 @@
   .btndelmovie:hover{background:#e5533d;color:#1a1401}
 
   /* ---------- 弹层 ---------- */
-  .mask{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:50;
+  /* 用 top/right/bottom/left 铺满，而不是 inset —— 电视浏览器版本普遍很老，
+     不认 inset 的话这两个层就没尺寸，等于「明明打开了却什么都看不见」 */
+  .mask{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(0,0,0,.72);z-index:50;
     display:none;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(3px)}
   .mask.on{display:flex}
   .sheet{
@@ -184,7 +186,7 @@
   .close:hover{color:var(--fg)}
 
   /* ---------- 网页播放层 ---------- */
-  .player{position:fixed;inset:0;background:#000;z-index:80;display:none;
+  .player{position:fixed;top:0;right:0;bottom:0;left:0;background:#000;z-index:80;display:none;
     flex-direction:column}
   .player.on{display:flex}
   .player .bar{display:flex;align-items:center;gap:12px;padding:10px 14px;
