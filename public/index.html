@@ -305,7 +305,7 @@
 <div class="player" id="player">
   <div class="bar">
     <span class="nm" id="playerName"></span>
-    <button id="playerOpenExt" title="用手机上的播放器打开（VLC / MX Player 等）">外部播放器</button>
+    <button id="playerOpenExt" title="用这台设备上的播放器打开（VLC / MX Player 等）">外部播放器</button>
     <button id="playerOpenLocal" title="用电脑上的播放器打开">本机播放器</button>
     <button id="playerCopyLink" title="复制播放链接（可粘进手机播放器打开）">复制链接</button>
     <button id="playerClose">关闭 ✕</button>
@@ -570,7 +570,7 @@ let playerFile = '';
 /** 播放层底部提示的默认文案（手机和电脑的出路不一样） */
 function defaultTip() {
   return IS_MOBILE
-    ? '手机浏览器多半放不了 .mkv / H.265——点上方「外部播放器」唤起手机上的播放器，或用「复制链接」粘进 VLC。'
+    ? '这台设备的浏览器多半放不了 .mkv / H.265——点上方「外部播放器」唤起这台设备上的播放器，或用「复制链接」粘进 VLC。'
     : '若画面出不来，说明浏览器不支持该格式（常见于 .mkv / H.265）——请改用「本机播放器」。';
 }
 
@@ -603,7 +603,7 @@ $('playerVideo').onerror = () => {
   const tip = $('playerTip');
   tip.style.color = '#e5533d';
   tip.textContent = IS_MOBILE
-    ? '浏览器放不了这个格式（多半是 .mkv 或 H.265）。点上方「外部播放器」调手机上的播放器打开。'
+    ? '浏览器放不了这个格式（多半是 .mkv 或 H.265）。点上方「外部播放器」调这台设备上的播放器打开。'
     : '这个格式浏览器放不了（多半是 .mkv 或 H.265）。请用「本机播放器」调电脑上的播放器打开。';
 };
 
@@ -619,6 +619,7 @@ function streamUrl(file) {
  *     否则视频会重新加载，看起来就是「点了没反应、还重播了一遍」
  */
 function onExternalFail(file, manual) {
+  toast('没唤起成功，改成在浏览器里播放…');
   if (manual && $('player').classList.contains('on')) setFailTip(true, file);
   else { openPlayer(file); setFailTip(false, file); }
 }
@@ -629,8 +630,8 @@ function setFailTip(manual, file) {
   tip.textContent = '';
   tip.style.color = '#e5533d';
   tip.appendChild(document.createTextNode(
-    (manual ? '还是没唤起。' : '没唤起手机上的播放器。')
-    + '多半是手机里没装视频播放器——装一个 VLC 之后就会好用；'
+    (manual ? '还是没唤起。' : '没唤起这台设备上的播放器。')
+    + '多半是这台设备上没装视频播放器——装一个 VLC 之后就会好用；'
     + '也可以直接在这里看，或点「复制链接」把链接粘进播放器打开。'));
 
   // 装了 VLC 的话，vlc:// 这条路比 intent:// 更直接。
@@ -654,25 +655,55 @@ function setFailTip(manual, file) {
   tip.appendChild(ua);
 }
 
+/** 屏幕底部的小气泡提示 —— 保证「点了至少有个反应」，也方便看出卡在哪一步 */
+function toast(msg, ms) {
+  let el = document.getElementById('mvToast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'mvToast';
+    el.style.cssText = 'position:fixed;left:50%;bottom:40px;transform:translateX(-50%);'
+      + 'background:rgba(18,23,29,.95);color:#e8ecf2;padding:10px 20px;border-radius:999px;'
+      + 'font-size:13px;line-height:1.5;z-index:999;pointer-events:none;opacity:0;'
+      + 'transition:opacity .25s;border:1px solid #2a333f;max-width:86vw;text-align:center';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = '0'; }, ms || 2600);
+}
+
 /**
- * 唤起外部播放器后系统会把这个页面切到后台，所以「到底唤起了没有」只能靠
- * 页面可见性判断：1.2 秒后如果本页还显示着，就说明没唤起成功
- *   （手机没装能处理 video/* 的播放器 / 浏览器不支持 intent:// / 被拦了）。
+ * 唤起外部播放器后系统会把这个页面切到后台，所以「到底唤起了没有」只能靠页面可见性判断：
+ * 1.2 秒后如果本页还显示着 → 没唤起成功。
+ *
+ * ★ 这里有个坑，电视上尤其明显：有些浏览器执行 intent:// 时只是**闪一下**进后台
+ *   （试图切到播放器但没成功），紧接着又显示了。旧代码一看到 hidden 就当「成功跳走」
+ *   把兜底取消掉 —— 用户切回来发现页面静悄悄地，什么都没发生，像是点了没反应。
+ *   所以现在改成：离开不到 3 秒又回来的一律算没成功，照样兜底；
+ *   只有离开 3 秒以上才认为真的跳去播放器了。
  */
 let extFallbackTimer = null;
 function armFallback(file, manual) {
   clearTimeout(extFallbackTimer);
-  const onHide = () => {
-    if (document.visibilityState === 'hidden') {      // 成功跳走了
-      clearTimeout(extFallbackTimer);
-      extFallbackTimer = null;
-      document.removeEventListener('visibilitychange', onHide);
+  let leftAt = 0;
+  const stop = () => {
+    clearTimeout(extFallbackTimer);
+    extFallbackTimer = null;
+    document.removeEventListener('visibilitychange', onVis);
+  };
+  const onVis = () => {
+    if (document.visibilityState === 'hidden') {
+      if (!leftAt) leftAt = Date.now();
+    } else if (leftAt) {
+      const away = Date.now() - leftAt;
+      leftAt = 0;
+      if (away < 3000) { stop(); onExternalFail(file, manual); }
     }
   };
-  document.addEventListener('visibilitychange', onHide);
+  document.addEventListener('visibilitychange', onVis);
   extFallbackTimer = setTimeout(() => {
-    extFallbackTimer = null;
-    document.removeEventListener('visibilitychange', onHide);
+    stop();
     if (document.visibilityState === 'visible') onExternalFail(file, manual);
   }, 1200);
 }
@@ -706,6 +737,7 @@ function openExternal(file, manual) {
   if (!target) { onExternalFail(file, manual); return; }   // 浏览器连 intent 都不支持
 
   armFallback(file, manual);
+  toast('正在唤起这台设备上的播放器…');     // 保证点了有反馈，也能看出卡在哪一步
   try { location.href = target; }
   catch { clearTimeout(extFallbackTimer); onExternalFail(file, manual); }
 }
@@ -713,7 +745,7 @@ function openExternal(file, manual) {
 /**
  * 唯一的「▶ 播放」入口，按设备自动选择：
  *   - 电脑浏览器  → 调本机播放器（openWithPlayer，走 /api/play）
- *   - 手机 / 平板 → 唤起手机上的播放器（openExternal），唤不起就退到网页播放
+ *   - 手机 / 电视 / 平板 → 唤起这台设备上的播放器（openExternal），唤不起就退到网页播放
  */
 function playSmart(file) {
   if (!file) return;
